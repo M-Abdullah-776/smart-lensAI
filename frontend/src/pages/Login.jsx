@@ -1,20 +1,45 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuthStore } from '../stores/authStore';
 import { ParticleBackground } from '../components/ParticleBackground';
 import { Navbar } from '../components/Navbar';
-import { Mail, Lock, Eye, EyeOff, ArrowRight, AlertCircle } from 'lucide-react';
+import api from '../services/api';
+import { Mail, Lock, Eye, EyeOff, ArrowRight, AlertCircle, Loader2, CheckCircle2 } from 'lucide-react';
 
 export const Login = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
+  const [backendReady, setBackendReady] = useState(null);
   const { login, isLoading } = useAuthStore();
   const navigate = useNavigate();
   const location = useLocation();
 
   const from = location.state?.from?.pathname || '/dashboard';
+
+  // Warn if arriving with expired token
+  useEffect(() => {
+    if (location.search.includes('expired=1')) {
+      setError('Your session has expired. Please sign in again.');
+    }
+  }, [location.search]);
+
+  // Ping backend on mount to warm it up
+  useEffect(() => {
+    const ping = async () => {
+      try {
+        await api.get('/api/health');
+        setBackendReady(true);
+      } catch {
+        setBackendReady(false);
+        setTimeout(async () => {
+          try { await api.get('/api/health'); setBackendReady(true); } catch { setBackendReady(false); }
+        }, 8000);
+      }
+    };
+    ping();
+  }, []);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -47,6 +72,20 @@ export const Login = () => {
             <h2 className="text-2xl font-bold font-display text-white">Welcome Back</h2>
             <p className="text-xs text-slate-400 mt-1">Sign in to access your analysis suite</p>
           </div>
+
+          {/* Backend Status Banner */}
+          {backendReady === false && (
+            <div className="mb-4 p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-300 text-xs flex items-center gap-2">
+              <Loader2 className="w-4 h-4 flex-shrink-0 animate-spin" />
+              <span>Server is waking up. Please wait ~20 seconds before signing in.</span>
+            </div>
+          )}
+          {backendReady === true && (
+            <div className="mb-4 p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-300 text-xs flex items-center gap-2">
+              <CheckCircle2 className="w-4 h-4 flex-shrink-0" />
+              <span>Server is online and ready.</span>
+            </div>
+          )}
 
           {error && (
             <div className="mb-6 p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-300 text-xs flex items-center gap-2">
@@ -100,11 +139,16 @@ export const Login = () => {
 
             <button
               type="submit"
-              disabled={isLoading}
-              className="w-full mt-2 py-3 rounded-xl bg-gradient-to-r from-indigo-500 via-indigo-600 to-violet-600 hover:from-indigo-600 hover:to-violet-700 text-white font-semibold text-sm shadow-lg shadow-indigo-600/30 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+              disabled={isLoading || backendReady === false}
+              className="w-full mt-2 py-3 rounded-xl bg-gradient-to-r from-indigo-500 via-indigo-600 to-violet-600 hover:from-indigo-600 hover:to-violet-700 text-white font-semibold text-sm shadow-lg shadow-indigo-600/30 transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {isLoading ? (
                 <div className="w-5 h-5 border-2 border-white/20 border-t-white rounded-full animate-spin" />
+              ) : backendReady === false ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <span>Server waking up...</span>
+                </>
               ) : (
                 <>
                   <span>Sign In</span>

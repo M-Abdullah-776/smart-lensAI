@@ -5,6 +5,15 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { App } from './App';
 import './index.css';
 
+// Eagerly ping the backend to warm it up from Render's cold-start sleep
+// This runs silently in the background so users never wait on first form submit
+(async () => {
+  try {
+    const base = import.meta.env.VITE_API_URL?.trim() || (import.meta.env.PROD ? 'https://smart-lensai.onrender.com' : 'http://localhost:8000');
+    await fetch(`${base}/api/health`, { method: 'GET', mode: 'cors', cache: 'no-store' });
+  } catch (_) { /* silent — backend unavailable or still waking */ }
+})();
+
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {

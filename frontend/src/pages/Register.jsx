@@ -1,9 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Navbar } from '../components/Navbar';
 import { ParticleBackground } from '../components/ParticleBackground';
 import api from '../services/api';
-import { User, Mail, Lock, Eye, EyeOff, CheckCircle2, AlertCircle, ArrowRight } from 'lucide-react';
+import { User, Mail, Lock, Eye, EyeOff, CheckCircle2, AlertCircle, ArrowRight, Loader2 } from 'lucide-react';
 
 export const Register = () => {
   const [fullName, setFullName] = useState('');
@@ -16,6 +16,24 @@ export const Register = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
+  const [backendReady, setBackendReady] = useState(null); // null=checking, true=ready, false=waking
+
+  // Ping backend on mount to warm it up
+  useEffect(() => {
+    const ping = async () => {
+      try {
+        await api.get('/api/health');
+        setBackendReady(true);
+      } catch {
+        setBackendReady(false);
+        // Retry once after 8 seconds
+        setTimeout(async () => {
+          try { await api.get('/api/health'); setBackendReady(true); } catch { setBackendReady(false); }
+        }, 8000);
+      }
+    };
+    ping();
+  }, []);
 
   // Password strength calculation
   const getPasswordStrength = (pass) => {
@@ -115,6 +133,20 @@ export const Register = () => {
               <span className="text-xs font-medium text-slate-300 hidden sm:inline">Verify</span>
             </div>
           </div>
+
+          {/* Backend Status Banner */}
+          {backendReady === false && (
+            <div className="mb-4 p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-300 text-xs flex items-center gap-2">
+              <Loader2 className="w-4 h-4 flex-shrink-0 animate-spin" />
+              <span>Server is waking up (free tier cold start). This takes ~20 seconds — please wait before submitting.</span>
+            </div>
+          )}
+          {backendReady === true && (
+            <div className="mb-4 p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-300 text-xs flex items-center gap-2">
+              <CheckCircle2 className="w-4 h-4 flex-shrink-0" />
+              <span>Server is online and ready.</span>
+            </div>
+          )}
 
           {error && (
             <div className="mb-6 p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-300 text-xs flex items-center gap-2">
