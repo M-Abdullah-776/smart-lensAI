@@ -75,13 +75,21 @@ export const Register = () => {
       });
       setSuccessMessage(res.data.message || 'Registration successful!');
     } catch (err) {
-      const detail = err.response?.data?.detail;
-      if (detail) {
-        setError(detail);
+      const data = err.response?.data;
+      if (data?.detail) {
+        if (Array.isArray(data.detail)) {
+          setError(data.detail.map((d) => d.msg || JSON.stringify(d)).join('. '));
+        } else if (typeof data.detail === 'string') {
+          setError(data.detail);
+        } else {
+          setError(JSON.stringify(data.detail));
+        }
+      } else if (data?.error) {
+        setError(typeof data.error === 'string' ? data.error : JSON.stringify(data.error));
       } else if (!err.response) {
-        setError('Could not reach the server. Please try again in a moment.');
+        setError('Server is momentarily restarting or waking up. Please wait 10 seconds and try again.');
       } else {
-        setError('Registration failed. Please try again.');
+        setError('Registration failed. Please check your details and try again.');
       }
     } finally {
       setLoading(false);
@@ -106,6 +114,9 @@ export const Register = () => {
               <div className={`w-7 h-7 rounded-full text-xs font-bold flex items-center justify-center ${
                 fullName && email ? 'bg-indigo-600 text-white' : 'bg-white/10 text-slate-400'
               }`}>1</div>
+
+
+
               <span className="text-xs font-medium text-slate-300 hidden sm:inline">Identity</span>
             </div>
             <div className="flex-1 h-0.5 mx-2 bg-white/10" />
