@@ -1,6 +1,18 @@
 {
   "rewrites": [
     {
+      "source": "/api/:match*",
+      "destination": "https://smart-lensai.onrender.com/api/:match*"
+    },
+    {
+      "source": "/auth/:match*",
+      "destination": "https://smart-lensai.onrender.com/auth/:match*"
+    },
+    {
+      "source": "/admin/:match*",
+      "destination": "https://smart-lensai.onrender.com/admin/:match*"
+    },
+    {
       "source": "/(.*)",
       "destination": "/index.html"
     }

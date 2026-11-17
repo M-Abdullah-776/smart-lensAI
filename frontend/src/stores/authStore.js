@@ -26,7 +26,7 @@ export const useAuthStore = create((set, get) => ({
       return { success: true };
     } catch (err) {
       set({ isLoading: false });
-      const message = err.response?.data?.detail || 'Login failed. Please check your credentials.';
+      const message = err.response?.data?.detail || (err.response ? 'Invalid email or password.' : 'Cannot connect to backend server. Please try again in a moment.');
       return { success: false, error: message };
     }
   },
