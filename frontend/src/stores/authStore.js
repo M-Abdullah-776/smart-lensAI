@@ -14,7 +14,9 @@ export const useAuthStore = create((set, get) => ({
       const { access_token, refresh_token, user } = response.data;
       
       localStorage.setItem('smartlens_access_token', access_token);
-      localStorage.setItem('smartlens_refresh_token', refresh_token);
+      if (refresh_token) {
+        localStorage.setItem('smartlens_refresh_token', refresh_token);
+      }
       localStorage.setItem('smartlens_user', JSON.stringify(user));
 
       set({
@@ -36,12 +38,10 @@ export const useAuthStore = create((set, get) => ({
 
   logout: async () => {
     const refreshToken = localStorage.getItem('smartlens_refresh_token');
-    if (refreshToken) {
-      try {
-        await api.post('/auth/logout', { refresh_token: refreshToken });
-      } catch (e) {
-        // Continue logout locally even if network fails
-      }
+    try {
+      await api.post('/auth/logout', { refresh_token: refreshToken || undefined });
+    } catch (e) {
+      // Complete client logout even if backend network call fails
     }
     localStorage.removeItem('smartlens_access_token');
     localStorage.removeItem('smartlens_refresh_token');
@@ -55,7 +55,6 @@ export const useAuthStore = create((set, get) => ({
       set({ user: res.data });
       localStorage.setItem('smartlens_user', JSON.stringify(res.data));
     } catch (err) {
-      // In case session expired
       if (err.response?.status === 401) {
         get().logout();
       }

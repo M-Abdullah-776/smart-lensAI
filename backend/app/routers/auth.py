@@ -1,7 +1,8 @@
-from fastapi import APIRouter, Depends, status, Request
+from fastapi import APIRouter, Depends, status, Request, Response
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, update
+from sqlalchemy import select, update, delete
 from datetime import datetime, timezone, timedelta
+from typing import Optional
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 
@@ -70,7 +71,12 @@ async def register(payload: UserCreate, db: AsyncSession = Depends(get_db)):
 
 @router.post("/login", response_model=TokenResponse)
 @limiter.limit("15/minute")
-async def login(request: Request, payload: UserLogin, db: AsyncSession = Depends(get_db)):
+async def login(
+    request: Request,
+    response: Response,
+    payload: UserLogin,
+    db: AsyncSession = Depends(get_db)
+):
     result = await db.execute(select(User).where(User.email == payload.email.lower()))
     user = result.scalar_one_or_none()
 
@@ -96,6 +102,17 @@ async def login(request: Request, payload: UserLogin, db: AsyncSession = Depends
     db.add(RefreshToken(user_id=user.id, token_hash=rt_hash, expires_at=expires_at))
     await db.commit()
 
+    # Set secure HttpOnly cookie for refresh token
+    response.set_cookie(
+        key="smartlens_refresh_token",
+        value=refresh_token,
+        httponly=True,
+        secure=True,
+        samesite="lax",
+        max_age=settings.REFRESH_TOKEN_EXPIRE_DAYS * 86400,
+        path="/"
+    )
+
     return TokenResponse(
         access_token=access_token,
         refresh_token=refresh_token,
@@ -103,16 +120,30 @@ async def login(request: Request, payload: UserLogin, db: AsyncSession = Depends
     )
 
 @router.post("/refresh")
-async def refresh_tokens(payload: TokenRefreshRequest, db: AsyncSession = Depends(get_db)):
+async def refresh_tokens(
+    request: Request,
+    response: Response,
+    payload: Optional[TokenRefreshRequest] = None,
+    db: AsyncSession = Depends(get_db)
+):
+    token = None
+    if payload and payload.refresh_token:
+        token = payload.refresh_token
+    if not token:
+        token = request.cookies.get("smartlens_refresh_token")
+
+    if not token:
+        raise SmartLensException(status.HTTP_401_UNAUTHORIZED, "Refresh token is missing.")
+
     try:
-        decoded = decode_token(payload.refresh_token)
+        decoded = decode_token(token)
         if decoded.get("type") != "refresh":
             raise SmartLensException(status.HTTP_401_UNAUTHORIZED, "Invalid token type.")
         user_id = decoded.get("sub")
     except Exception:
         raise SmartLensException(status.HTTP_401_UNAUTHORIZED, "Refresh token is invalid or expired.")
 
-    rt_hash = hash_token(payload.refresh_token)
+    rt_hash = hash_token(token)
     stored = await db.execute(select(RefreshToken).where(RefreshToken.token_hash == rt_hash))
     token_entry = stored.scalar_one_or_none()
 
@@ -124,17 +155,57 @@ async def refresh_tokens(payload: TokenRefreshRequest, db: AsyncSession = Depend
     if not user or not user.is_active:
         raise SmartLensException(status.HTTP_401_UNAUTHORIZED, "User inactive or not found.")
 
+    # Token rotation: remove old token, issue new pair
+    await db.delete(token_entry)
+    await db.flush()
+    
     new_access_token = create_access_token({"sub": str(user.id), "role": user.role.value})
-    return {"access_token": new_access_token, "token_type": "bearer"}
+    new_refresh_token = create_refresh_token({"sub": str(user.id)})
+    
+    new_rt_hash = hash_token(new_refresh_token)
+    new_expires_at = datetime.now(timezone.utc) + timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS)
+    db.add(RefreshToken(user_id=user.id, token_hash=new_rt_hash, expires_at=new_expires_at))
+    await db.commit()
+
+    # Update HttpOnly cookie
+    response.set_cookie(
+        key="smartlens_refresh_token",
+        value=new_refresh_token,
+        httponly=True,
+        secure=True,
+        samesite="lax",
+        max_age=settings.REFRESH_TOKEN_EXPIRE_DAYS * 86400,
+        path="/"
+    )
+
+    return {
+        "access_token": new_access_token,
+        "refresh_token": new_refresh_token,
+        "token_type": "bearer"
+    }
 
 @router.post("/logout")
-async def logout(payload: TokenRefreshRequest, db: AsyncSession = Depends(get_db)):
-    rt_hash = hash_token(payload.refresh_token)
-    result = await db.execute(select(RefreshToken).where(RefreshToken.token_hash == rt_hash))
-    token_entry = result.scalar_one_or_none()
-    if token_entry:
-        await db.delete(token_entry)
-        await db.commit()
+async def logout(
+    request: Request,
+    response: Response,
+    payload: Optional[TokenRefreshRequest] = None,
+    db: AsyncSession = Depends(get_db)
+):
+    token = None
+    if payload and payload.refresh_token:
+        token = payload.refresh_token
+    if not token:
+        token = request.cookies.get("smartlens_refresh_token")
+
+    if token:
+        rt_hash = hash_token(token)
+        result = await db.execute(select(RefreshToken).where(RefreshToken.token_hash == rt_hash))
+        token_entry = result.scalar_one_or_none()
+        if token_entry:
+            await db.delete(token_entry)
+            await db.commit()
+
+    response.delete_cookie(key="smartlens_refresh_token", path="/")
     return {"message": "Logged out successfully."}
 
 @router.get("/verify-email")

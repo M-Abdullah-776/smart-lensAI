@@ -55,7 +55,7 @@ class TokenResponse(BaseModel):
     user: UserOut
 
 class TokenRefreshRequest(BaseModel):
-    refresh_token: str
+    refresh_token: Optional[str] = None
 
 class PasswordChange(BaseModel):
     old_password: str

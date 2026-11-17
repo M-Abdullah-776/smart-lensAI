@@ -1,9 +1,6 @@
 import axios from 'axios';
 
-// SmartLens API client
-// 1. If VITE_API_URL is explicitly set, use it.
-// 2. In production without an explicit env var, connect directly to the production Render backend.
-// 3. In local development, connect to the local FastAPI dev server.
+// SmartLens API client with secure credentials and direct/proxy fallback
 const envUrl = (import.meta.env.VITE_API_URL || '').trim();
 let determinedUrl = envUrl;
 if (!determinedUrl) {
@@ -18,10 +15,11 @@ const cleanBaseUrl = determinedUrl.endsWith('/') ? determinedUrl.slice(0, -1) : 
 
 const api = axios.create({
   baseURL: cleanBaseUrl,
+  withCredentials: true,
   headers: {
     'Content-Type': 'application/json',
   },
-  timeout: 60000, // 60 seconds to accommodate Render free-tier cold starts
+  timeout: 60000, // Accommodate cold starts on cloud containers
 });
 
 api.interceptors.request.use((config) => {
@@ -36,23 +34,28 @@ api.interceptors.response.use(
   (response) => response,
   async (error) => {
     const originalRequest = error.config;
-    if (error.response?.status === 401 && !originalRequest._retry) {
+    // Attempt automatic refresh on 401 if not already retried
+    if (error.response?.status === 401 && !originalRequest._retry && !originalRequest.url?.includes('/auth/login')) {
       originalRequest._retry = true;
       const refreshToken = localStorage.getItem('smartlens_refresh_token');
-      if (refreshToken) {
-        try {
-          const res = await axios.post(
-            `${cleanBaseUrl}/auth/refresh`,
-            { refresh_token: refreshToken }
-          );
-          const newAccessToken = res.data.access_token;
-          localStorage.setItem('smartlens_access_token', newAccessToken);
-          originalRequest.headers.Authorization = `Bearer ${newAccessToken}`;
-          return api(originalRequest);
-        } catch (refreshErr) {
-          localStorage.removeItem('smartlens_access_token');
-          localStorage.removeItem('smartlens_refresh_token');
-          localStorage.removeItem('smartlens_user');
+      try {
+        const res = await axios.post(
+          `${cleanBaseUrl}/auth/refresh`,
+          { refresh_token: refreshToken || undefined },
+          { withCredentials: true }
+        );
+        const { access_token, refresh_token: newRefreshToken } = res.data;
+        localStorage.setItem('smartlens_access_token', access_token);
+        if (newRefreshToken) {
+          localStorage.setItem('smartlens_refresh_token', newRefreshToken);
+        }
+        originalRequest.headers.Authorization = `Bearer ${access_token}`;
+        return api(originalRequest);
+      } catch (refreshErr) {
+        localStorage.removeItem('smartlens_access_token');
+        localStorage.removeItem('smartlens_refresh_token');
+        localStorage.removeItem('smartlens_user');
+        if (window.location.pathname !== '/login') {
           window.location.href = '/login?expired=1';
         }
       }
