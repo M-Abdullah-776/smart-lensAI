@@ -1,17 +1,17 @@
 import axios from 'axios';
 
-// SmartLens API client with secure credentials and direct/proxy fallback
+// In production on Vercel, use same-origin calls (Vercel rewrites proxy to Render backend).
+// In local dev, call localhost:8000 directly.
+// If VITE_API_URL is explicitly set, that overrides everything.
 const envUrl = (import.meta.env.VITE_API_URL || '').trim();
-let determinedUrl = envUrl;
-if (!determinedUrl) {
-  if (import.meta.env.PROD) {
-    determinedUrl = 'https://smart-lensai.onrender.com';
-  } else {
-    determinedUrl = 'http://localhost:8000';
-  }
+let baseURL = envUrl;
+if (!baseURL) {
+  // PROD on Vercel: use empty string so all /auth/* /api/* /admin/* go through
+  // the Vercel rewrite rules defined in vercel.json (avoids CORS completely)
+  baseURL = import.meta.env.PROD ? '' : 'http://localhost:8000';
 }
 
-const cleanBaseUrl = determinedUrl.endsWith('/') ? determinedUrl.slice(0, -1) : determinedUrl;
+const cleanBaseUrl = baseURL.endsWith('/') ? baseURL.slice(0, -1) : baseURL;
 
 const api = axios.create({
   baseURL: cleanBaseUrl,
@@ -19,7 +19,7 @@ const api = axios.create({
   headers: {
     'Content-Type': 'application/json',
   },
-  timeout: 60000, // Accommodate cold starts on cloud containers
+  timeout: 60000,
 });
 
 api.interceptors.request.use((config) => {
@@ -34,7 +34,6 @@ api.interceptors.response.use(
   (response) => response,
   async (error) => {
     const originalRequest = error.config;
-    // Attempt automatic refresh on 401 if not already retried
     if (error.response?.status === 401 && !originalRequest._retry && !originalRequest.url?.includes('/auth/login')) {
       originalRequest._retry = true;
       const refreshToken = localStorage.getItem('smartlens_refresh_token');
@@ -51,7 +50,7 @@ api.interceptors.response.use(
         }
         originalRequest.headers.Authorization = `Bearer ${access_token}`;
         return api(originalRequest);
-      } catch (refreshErr) {
+      } catch {
         localStorage.removeItem('smartlens_access_token');
         localStorage.removeItem('smartlens_refresh_token');
         localStorage.removeItem('smartlens_user');
