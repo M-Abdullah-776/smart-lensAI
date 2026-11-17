@@ -2,12 +2,17 @@ import axios from 'axios';
 
 // In production on Vercel, use same-origin calls (Vercel rewrites proxy to Render backend).
 // In local dev, call localhost:8000 directly.
-// If VITE_API_URL is explicitly set, that overrides everything.
-const envUrl = (import.meta.env.VITE_API_URL || '').trim();
+let envUrl = (import.meta.env.VITE_API_URL || '').trim();
+
+// Reject known incorrect or outdated backend URLs from old Vercel deployments
+if (envUrl.includes('smartlens-backend.onrender.com')) {
+  envUrl = '';
+}
+
 let baseURL = envUrl;
 if (!baseURL) {
   // PROD on Vercel: use empty string so all /auth/* /api/* /admin/* go through
-  // the Vercel rewrite rules defined in vercel.json (avoids CORS completely)
+  // the Vercel rewrite rules defined in vercel.json (which routes to https://smart-lensai.onrender.com)
   baseURL = import.meta.env.PROD ? '' : 'http://localhost:8000';
 }
 
