@@ -62,7 +62,11 @@ export const Register = () => {
       });
       setSuccessMessage(res.data.message || 'Registration successful!');
     } catch (err) {
-      setError(err.response?.data?.detail || 'Registration failed. Please try again.');
+      if (!err.response) {
+        setError('Cannot connect to backend server. Please verify that your Render backend is Live and VITE_API_URL is configured on Vercel.');
+      } else {
+        setError(err.response?.data?.detail || 'Registration failed. Please check your details.');
+      }
     } finally {
       setLoading(false);
     }
