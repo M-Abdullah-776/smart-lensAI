@@ -38,7 +38,7 @@ class Settings(BaseSettings):
     
     MAX_UPLOAD_SIZE_MB: int = 10
     DAILY_AI_REQUEST_LIMIT: int = 50
-    CORS_ORIGINS: str = "http://localhost:5173,http://localhost:3000,http://127.0.0.1:5173"
+    CORS_ORIGINS: str = "*"
 
     @property
     def cors_origins_list(self) -> List[str]:

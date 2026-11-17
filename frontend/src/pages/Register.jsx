@@ -65,7 +65,7 @@ export const Register = () => {
       console.error('Registration failed:', err);
 
       if (!err.response) {
-        setError('Cannot connect to backend server. Please verify that your Render backend is Live and VITE_API_URL is configured on Vercel.');
+        setError('Cannot connect to backend server. The backend may be waking up — please wait a moment and try again.');
       } else {
         setError(err.response?.data?.detail || 'Registration failed. Please try again.');
       }

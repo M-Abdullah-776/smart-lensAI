@@ -1,17 +1,27 @@
 import axios from 'axios';
 
-// When VITE_API_URL is set (e.g. https://smart-lensai.onrender.com), API calls go
-// directly to that origin. When it is empty (default for Vercel), requests go to the
-// same origin and Vercel rewrites proxy them to the Render backend.
-const rawUrl = (import.meta.env.VITE_API_URL || '').trim();
-const cleanBaseUrl = rawUrl.endsWith('/') ? rawUrl.slice(0, -1) : rawUrl;
+// SmartLens API client
+// 1. If VITE_API_URL is explicitly set, use it.
+// 2. In production without an explicit env var, connect directly to the production Render backend.
+// 3. In local development, connect to the local FastAPI dev server.
+const envUrl = (import.meta.env.VITE_API_URL || '').trim();
+let determinedUrl = envUrl;
+if (!determinedUrl) {
+  if (import.meta.env.PROD) {
+    determinedUrl = 'https://smart-lensai.onrender.com';
+  } else {
+    determinedUrl = 'http://localhost:8000';
+  }
+}
+
+const cleanBaseUrl = determinedUrl.endsWith('/') ? determinedUrl.slice(0, -1) : determinedUrl;
 
 const api = axios.create({
   baseURL: cleanBaseUrl,
   headers: {
     'Content-Type': 'application/json',
   },
-  timeout: 30000, // 30-second timeout for Render cold starts
+  timeout: 60000, // 60 seconds to accommodate Render free-tier cold starts
 });
 
 api.interceptors.request.use((config) => {
