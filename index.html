@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SmartLens AI – Intelligent Content Analysis</title>
+  <link rel="stylesheet" href="css/style.css" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+</head>
+<body>
+
+  <!-- ══ LOADING SCREEN ══ -->
+  <div id="loader">
+    <div class="loader-inner">
+      <div class="loader-logo">
+        <div class="loader-icon">🔍</div>
+        <div class="loader-text">SmartLens AI</div>
+      </div>
+      <div class="loader-bar"><div class="loader-fill"></div></div>
+      <div class="loader-status">Initializing AI Engine...</div>
+    </div>
+  </div>
+
+  <!-- ══ 3D BACKGROUND CANVAS ══ -->
+  <canvas id="bg-canvas"></canvas>
+
+  <!-- ══ NAVBAR ══ -->
+  <nav id="navbar">
+    <div class="nav-container">
+      <a href="index.html" class="nav-brand">
+        <span class="brand-icon">🔍</span>
+        <span class="brand-text">SmartLens <span class="brand-ai">AI</span></span>
+      </a>
+      <div class="nav-links" id="navLinks">
+        <a href="#features" class="nav-link">Features</a>
+        <a href="#how-it-works" class="nav-link">How It Works</a>
+        <a href="#about" class="nav-link">About</a>
+      </div>
+      <div class="nav-actions">
+        <a href="login.html" class="btn btn-outline">Log In</a>
+        <a href="register.html" class="btn btn-primary">Sign Up</a>
+      </div>
+      <button class="hamburger" id="hamburger">☰</button>
+    </div>
+  </nav>
+
+  <!-- ══ HERO SECTION ══ -->
+  <section id="hero">
+    <div class="hero-container">
+      <div class="hero-badge">🚀 AI-Powered Content Intelligence</div>
+      <h1 class="hero-title">
+        Analyze <span class="gradient-text">Anything</span>,<br/>
+        Understand <span class="gradient-text">Everything</span>
+      </h1>
+      <p class="hero-subtitle">
+        SmartLens AI is your all-in-one platform for documents, videos, PDFs,
+        resumes, and web content — powered by cutting-edge artificial intelligence.
+      </p>
+      <div class="hero-actions">
+        <a href="register.html" class="btn btn-primary btn-lg">
+          <span>Get Started Free</span>
+          <span class="btn-arrow">→</span>
+        </a>
+        <a href="#features" class="btn btn-glass btn-lg">
+          <span>Explore Features</span>
+        </a>
+      </div>
+      <div class="hero-stats">
+        <div class="hero-stat">
+          <div class="stat-num" data-count="50000">0</div>
+          <div class="stat-label">Documents Analyzed</div>
+        </div>
+        <div class="hero-stat-divider"></div>
+        <div class="hero-stat">
+          <div class="stat-num" data-count="12000">0</div>
+          <div class="stat-label">Videos Summarized</div>
+        </div>
+        <div class="hero-stat-divider"></div>
+        <div class="hero-stat">
+          <div class="stat-num" data-count="8500">0</div>
+          <div class="stat-label">Resumes Reviewed</div>
+        </div>
+        <div class="hero-stat-divider"></div>
+        <div class="hero-stat">
+          <div class="stat-num" data-count="99">0</div>
+          <div class="stat-label">% Accuracy</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- floating cards -->
+    <div class="floating-cards">
+      <div class="float-card fc1">📄 Document Analyzed</div>
+      <div class="float-card fc2">▶ Video Summarized</div>
+      <div class="float-card fc3">✅ Resume Matched 92%</div>
+      <div class="float-card fc4">🌐 URL Content Extracted</div>
+    </div>
+  </section>
+
+  <!-- ══ FEATURES SECTION ══ -->
+  <section id="features">
+    <div class="section-container">
+      <div class="section-header">
+        <div class="section-badge">Our Features</div>
+        <h2 class="section-title">5 Powerful AI Modules</h2>
+        <p class="section-sub">Everything you need to analyze, understand, and extract insights from any content source</p>
+      </div>
+      <div class="features-grid">
+
+        <a href="document-analyzer.html" class="feature-card" data-tilt>
+          <div class="fc-glow"></div>
+          <div class="fc-icon">📄</div>
+          <h3>Document Analyzer</h3>
+          <p>Upload any document — PDF, DOCX, or TXT — and get an instant AI-generated summary with key insights.</p>
+          <div class="fc-tags">
+            <span class="fc-tag">PDF</span>
+            <span class="fc-tag">DOCX</span>
+            <span class="fc-tag">TXT</span>
+          </div>
+          <div class="fc-arrow">→</div>
+        </a>
+
+        <a href="youtube-summarizer.html" class="feature-card" data-tilt>
+          <div class="fc-glow"></div>
+          <div class="fc-icon">▶️</div>
+          <h3>YouTube Summarizer</h3>
+          <p>Paste any YouTube video URL and get a concise, structured summary of the entire video content.</p>
+          <div class="fc-tags">
+            <span class="fc-tag">YouTube URL</span>
+            <span class="fc-tag">Transcript</span>
+          </div>
+          <div class="fc-arrow">→</div>
+        </a>
+
+        <a href="pdf-qa.html" class="feature-card feature-card-highlight" data-tilt>
+          <div class="fc-glow"></div>
+          <div class="fc-badge">Most Popular</div>
+          <div class="fc-icon">❓</div>
+          <h3>PDF Q&amp;A System</h3>
+          <p>Upload a PDF and ask any question about its content. Get precise, context-aware answers instantly.</p>
+          <div class="fc-tags">
+            <span class="fc-tag">PDF Upload</span>
+            <span class="fc-tag">Q&amp;A</span>
+          </div>
+          <div class="fc-arrow">→</div>
+        </a>
+
+        <a href="resume-analyzer.html" class="feature-card" data-tilt>
+          <div class="fc-glow"></div>
+          <div class="fc-icon">📝</div>
+          <h3>Resume Analyzer</h3>
+          <p>Upload your resume and job description to get a detailed match score, strengths, and improvement suggestions.</p>
+          <div class="fc-tags">
+            <span class="fc-tag">PDF</span>
+            <span class="fc-tag">DOCX</span>
+            <span class="fc-tag">Job Match</span>
+          </div>
+          <div class="fc-arrow">→</div>
+        </a>
+
+        <a href="url-analyzer.html" class="feature-card" data-tilt>
+          <div class="fc-glow"></div>
+          <div class="fc-icon">🌐</div>
+          <h3>URL Analyzer</h3>
+          <p>Enter any public webpage URL to extract, analyze, and summarize its key content and information.</p>
+          <div class="fc-tags">
+            <span class="fc-tag">Web URL</span>
+            <span class="fc-tag">Articles</span>
+          </div>
+          <div class="fc-arrow">→</div>
+        </a>
+
+      </div>
+    </div>
+  </section>
+
+  <!-- ══ HOW IT WORKS ══ -->
+  <section id="how-it-works">
+    <div class="section-container">
+      <div class="section-header">
+        <div class="section-badge">Process</div>
+        <h2 class="section-title">How SmartLens AI Works</h2>
+        <p class="section-sub">Four simple steps to transform any content into actionable insights</p>
+      </div>
+      <div class="steps-container">
+        <div class="step-item">
+          <div class="step-number">01</div>
+          <div class="step-icon">🎯</div>
+          <h3>Select Feature</h3>
+          <p>Choose from 5 AI-powered modules based on your content type and analysis need.</p>
+        </div>
+        <div class="step-connector">
+          <div class="connector-line"></div>
+          <div class="connector-dot"></div>
+        </div>
+        <div class="step-item">
+          <div class="step-number">02</div>
+          <div class="step-icon">📤</div>
+          <h3>Provide Input</h3>
+          <p>Upload your file or paste a URL. We support PDF, DOCX, TXT, YouTube links, and web URLs.</p>
+        </div>
+        <div class="step-connector">
+          <div class="connector-line"></div>
+          <div class="connector-dot"></div>
+        </div>
+        <div class="step-item">
+          <div class="step-number">03</div>
+          <div class="step-icon">🧠</div>
+          <h3>AI Processing</h3>
+          <p>Our AI engine extracts, validates, and processes your content using advanced language models.</p>
+        </div>
+        <div class="step-connector">
+          <div class="connector-line"></div>
+          <div class="connector-dot"></div>
+        </div>
+        <div class="step-item">
+          <div class="step-number">04</div>
+          <div class="step-icon">✨</div>
+          <h3>Get Results</h3>
+          <p>Receive summaries, answers, analysis reports, or resume feedback — clear and actionable.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ══ USE CASES ══ -->
+  <section id="about">
+    <div class="section-container">
+      <div class="section-header">
+        <div class="section-badge">Use Cases</div>
+        <h2 class="section-title">Who Uses SmartLens AI?</h2>
+      </div>
+      <div class="usecases-grid">
+        <div class="usecase-card">
+          <div class="uc-icon">🎓</div>
+          <h3>Students</h3>
+          <p>Summarize lectures, analyze PDFs, understand YouTube tutorials faster</p>
+        </div>
+        <div class="usecase-card">
+          <div class="uc-icon">🔬</div>
+          <h3>Researchers</h3>
+          <p>Extract key findings from papers, compare sources, review web articles</p>
+        </div>
+        <div class="usecase-card">
+          <div class="uc-icon">💼</div>
+          <h3>Job Seekers</h3>
+          <p>Get resume feedback and match your profile against job descriptions</p>
+        </div>
+        <div class="usecase-card">
+          <div class="uc-icon">🏢</div>
+          <h3>Professionals</h3>
+          <p>Quickly digest reports, documents, and online content to stay ahead</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ══ CTA BANNER ══ -->
+  <section id="cta-banner">
+    <div class="cta-container">
+      <h2>Ready to Analyze Smarter?</h2>
+      <p>Join thousands of users saving hours every week with SmartLens AI</p>
+      <div class="cta-actions">
+        <a href="register.html" class="btn btn-primary btn-lg">Start for Free →</a>
+        <a href="login.html" class="btn btn-glass btn-lg">Already a member? Log In</a>
+      </div>
+    </div>
+  </section>
+
+  <!-- ══ FOOTER ══ -->
+  <footer id="footer">
+    <div class="footer-container">
+      <div class="footer-brand">
+        <div class="footer-logo">🔍 SmartLens AI</div>
+        <p>Intelligent multi-source content analysis and question answering system.</p>
+      </div>
+      <div class="footer-links">
+        <div class="footer-col">
+          <h4>Features</h4>
+          <a href="document-analyzer.html">Document Analyzer</a>
+          <a href="youtube-summarizer.html">YouTube Summarizer</a>
+          <a href="pdf-qa.html">PDF Q&amp;A</a>
+          <a href="resume-analyzer.html">Resume Analyzer</a>
+          <a href="url-analyzer.html">URL Analyzer</a>
+        </div>
+        <div class="footer-col">
+          <h4>Account</h4>
+          <a href="login.html">Log In</a>
+          <a href="register.html">Sign Up</a>
+          <a href="dashboard.html">Dashboard</a>
+        </div>
+        <div class="footer-col">
+          <h4>Legal</h4>
+          <a href="#">Privacy Policy</a>
+          <a href="#">Terms of Service</a>
+          <a href="#">Contact</a>
+        </div>
+      </div>
+    </div>
+    <div class="footer-bottom">
+      <p>© 2026 SmartLens AI. All rights reserved.</p>
+    </div>
+  </footer>
+
+  <script src="js/three.min.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>

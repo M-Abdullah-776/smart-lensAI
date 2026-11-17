@@ -1,0 +1,58 @@
+version: '3.8'
+
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: smartlens-postgres
+    restart: always
+    environment:
+      POSTGRES_USER: smartlens_user
+      POSTGRES_PASSWORD: smartlens_password
+      POSTGRES_DB: smartlens_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U smartlens_user -d smartlens_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: smartlens-backend
+    restart: always
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      - DATABASE_URL=postgresql://smartlens_user:smartlens_password@db:5432/smartlens_db
+      - SECRET_KEY=smartlens_production_super_secret_jwt_key_2026_min32chars
+      - ALGORITHM=HS256
+      - AI_PROVIDER=gemini
+      - AI_API_KEY=${AI_API_KEY:-}
+      - AI_MODEL=gemini-1.5-pro
+      - ADMIN_EMAIL=admin@smartlens.ai
+      - ADMIN_PASSWORD=Admin@12345
+      - EMAIL_VERIFICATION=false
+      - FRONTEND_URL=http://localhost:5173
+      - CORS_ORIGINS=http://localhost:5173,http://localhost:3000,http://127.0.0.1:5173
+    ports:
+      - "8000:8000"
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: smartlens-frontend
+    restart: always
+    depends_on:
+      - backend
+    ports:
+      - "5173:80"
+
+volumes:
+  postgres_data:

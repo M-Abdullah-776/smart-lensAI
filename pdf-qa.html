@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PDF Q&amp;A System – SmartLens AI</title>
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+
+  <!-- Loader -->
+  <div id="loader">
+    <div class="loader-inner">
+      <div class="loader-logo">SmartLens <span class="gradient-text">AI</span></div>
+      <div class="loader-bar"><div class="loader-fill"></div></div>
+    </div>
+  </div>
+
+  <!-- 3D Background -->
+  <canvas id="bg-canvas"></canvas>
+
+  <!-- Navbar -->
+  <nav id="navbar">
+    <div class="nav-container">
+      <a href="index.html" class="nav-brand">SmartLens <span class="gradient-text">AI</span></a>
+      <ul class="nav-links" id="navLinks">
+        <li><a href="index.html" class="nav-link">Home</a></li>
+        <li><a href="document-analyzer.html" class="nav-link">Document Analyzer</a></li>
+        <li><a href="youtube-summarizer.html" class="nav-link">YouTube Summarizer</a></li>
+        <li><a href="pdf-qa.html" class="nav-link active">PDF Q&amp;A</a></li>
+        <li><a href="resume-analyzer.html" class="nav-link">Resume Analyzer</a></li>
+        <li><a href="url-analyzer.html" class="nav-link">URL Analyzer</a></li>
+      </ul>
+      <div class="nav-actions">
+        <a href="dashboard.html" class="btn btn-primary">Dashboard</a>
+        <button class="hamburger" id="hamburger" aria-label="Toggle menu">
+          <span></span><span></span><span></span>
+        </button>
+      </div>
+    </div>
+  </nav>
+
+  <!-- Tool Page -->
+  <main class="tool-page section-container">
+    <div class="tool-header">
+      <h1>❓ PDF Q&amp;A System</h1>
+      <p class="tool-subtitle">Upload a PDF and ask questions about its content</p>
+    </div>
+
+    <div class="tool-card glass-card">
+
+      <!-- Upload Zone -->
+      <div class="upload-zone" id="uploadZone">
+        <div class="upload-icon">📄</div>
+        <p class="upload-title">Drag &amp; drop your PDF here</p>
+        <p class="upload-sub">or click to browse</p>
+        <p class="upload-formats">Supports: PDF</p>
+        <input type="file" id="fileInput" accept=".pdf" hidden />
+      </div>
+
+      <!-- File Info -->
+      <div class="file-info" id="fileInfo" style="display:none;">
+        <span class="file-info-icon">📄</span>
+        <span id="fileName">No file selected</span>
+        <button class="btn btn-sm btn-glass" id="clearFile" title="Remove file">✕</button>
+      </div>
+
+      <!-- Spinner -->
+      <div class="spinner" id="spinner" style="display:none;"></div>
+
+      <!-- Q&A Chat Container (shown after upload) -->
+      <div class="qa-chat-container" id="qaChatContainer" style="display:none;">
+        <div class="qa-messages" id="qaMessages">
+          <div class="qa-message qa-message--system">
+            <span class="qa-avatar">🤖</span>
+            <div class="qa-bubble">
+              PDF loaded successfully! Ask me anything about this document.
+            </div>
+          </div>
+        </div>
+        <div class="qa-input-row">
+          <textarea
+            id="qaQuestion"
+            class="form-input qa-textarea"
+            placeholder="Type your question about the document..."
+            rows="2"
+          ></textarea>
+          <button class="btn btn-primary" id="sendBtn">
+            Send
+          </button>
+        </div>
+      </div>
+
+    </div><!-- /.tool-card -->
+  </main>
+
+  <!-- Footer -->
+  <footer id="footer">
+    <div class="footer-container">
+      <div class="footer-brand">
+        <span>SmartLens <span class="gradient-text">AI</span></span>
+        <p>Powered by advanced AI for smarter document intelligence.</p>
+      </div>
+      <div class="footer-links">
+        <div class="footer-col">
+          <h4>Tools</h4>
+          <a href="document-analyzer.html">Document Analyzer</a>
+          <a href="youtube-summarizer.html">YouTube Summarizer</a>
+          <a href="pdf-qa.html">PDF Q&amp;A</a>
+          <a href="resume-analyzer.html">Resume Analyzer</a>
+          <a href="url-analyzer.html">URL Analyzer</a>
+        </div>
+        <div class="footer-col">
+          <h4>Account</h4>
+          <a href="login.html">Login</a>
+          <a href="register.html">Register</a>
+          <a href="dashboard.html">Dashboard</a>
+        </div>
+      </div>
+    </div>
+    <div class="footer-bottom">
+      <p>&copy; 2024 SmartLens AI. All rights reserved.</p>
+    </div>
+  </footer>
+
+  <script src="js/three.min.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>

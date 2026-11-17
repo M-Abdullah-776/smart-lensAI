@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Resume Analyzer – SmartLens AI</title>
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+
+  <!-- Loader -->
+  <div id="loader">
+    <div class="loader-inner">
+      <div class="loader-logo">SmartLens <span class="gradient-text">AI</span></div>
+      <div class="loader-bar"><div class="loader-fill"></div></div>
+    </div>
+  </div>
+
+  <!-- 3D Background -->
+  <canvas id="bg-canvas"></canvas>
+
+  <!-- Navbar -->
+  <nav id="navbar">
+    <div class="nav-container">
+      <a href="index.html" class="nav-brand">SmartLens <span class="gradient-text">AI</span></a>
+      <ul class="nav-links" id="navLinks">
+        <li><a href="index.html" class="nav-link">Home</a></li>
+        <li><a href="document-analyzer.html" class="nav-link">Document Analyzer</a></li>
+        <li><a href="youtube-summarizer.html" class="nav-link">YouTube Summarizer</a></li>
+        <li><a href="pdf-qa.html" class="nav-link">PDF Q&amp;A</a></li>
+        <li><a href="resume-analyzer.html" class="nav-link active">Resume Analyzer</a></li>
+        <li><a href="url-analyzer.html" class="nav-link">URL Analyzer</a></li>
+      </ul>
+      <div class="nav-actions">
+        <a href="dashboard.html" class="btn btn-primary">Dashboard</a>
+        <button class="hamburger" id="hamburger" aria-label="Toggle menu">
+          <span></span><span></span><span></span>
+        </button>
+      </div>
+    </div>
+  </nav>
+
+  <!-- Tool Page -->
+  <main class="tool-page section-container">
+    <div class="tool-header">
+      <h1>📝 Resume Analyzer &amp; Job Matcher</h1>
+      <p class="tool-subtitle">Upload your resume and match it against a job description</p>
+    </div>
+
+    <div class="tool-card glass-card">
+
+      <!-- Two-column Input Layout -->
+      <div class="resume-input-grid">
+        <!-- Left: Resume Upload -->
+        <div class="resume-upload-col">
+          <h3 class="col-title">📎 Upload Resume</h3>
+          <div class="upload-zone" id="uploadZone">
+            <div class="upload-icon">📝</div>
+            <p class="upload-title">Drag &amp; drop your resume here</p>
+            <p class="upload-sub">or click to browse</p>
+            <p class="upload-formats">Supports: PDF, DOCX</p>
+            <input type="file" id="fileInput" accept=".pdf,.docx" hidden />
+          </div>
+          <div class="file-info" id="fileInfo" style="display:none;">
+            <span class="file-info-icon">📝</span>
+            <span id="fileName">No file selected</span>
+            <button class="btn btn-sm btn-glass" id="clearFile" title="Remove file">✕</button>
+          </div>
+        </div>
+
+        <!-- Right: Job Description -->
+        <div class="resume-jd-col">
+          <h3 class="col-title">💼 Job Description <span class="optional-tag">(optional)</span></h3>
+          <textarea
+            id="jobDescription"
+            class="form-input jd-textarea"
+            placeholder="Paste job description here..."
+            rows="10"
+          ></textarea>
+        </div>
+      </div>
+
+      <!-- Analyze Button -->
+      <div class="action-row">
+        <button class="btn btn-primary btn-lg" id="analyzeBtn">
+          Analyze Resume
+        </button>
+      </div>
+
+      <!-- Spinner -->
+      <div class="spinner" id="spinner" style="display:none;"></div>
+
+      <!-- Result Box -->
+      <div class="result-box" id="resultBox" style="display:none;">
+        <div class="result-header">
+          <span class="result-label">📝 Resume Analysis</span>
+          <button class="btn btn-sm btn-glass" id="copyBtn" title="Copy result">📋 Copy</button>
+        </div>
+
+        <!-- Score Section -->
+        <div class="resume-score-section">
+          <div class="resume-score-ring">
+            <svg viewBox="0 0 120 120" width="120" height="120" aria-label="Match score gauge">
+              <!-- Background track -->
+              <circle
+                cx="60" cy="60" r="50"
+                fill="none"
+                stroke="rgba(255,255,255,0.08)"
+                stroke-width="12"
+              />
+              <!-- Progress arc -->
+              <circle
+                id="scoreArc"
+                cx="60" cy="60" r="50"
+                fill="none"
+                stroke="url(#scoreGradient)"
+                stroke-width="12"
+                stroke-linecap="round"
+                stroke-dasharray="314"
+                stroke-dashoffset="314"
+                transform="rotate(-90 60 60)"
+              />
+              <defs>
+                <linearGradient id="scoreGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+                  <stop offset="0%" stop-color="#6366f1" />
+                  <stop offset="100%" stop-color="#06b6d4" />
+                </linearGradient>
+              </defs>
+              <text x="60" y="55" text-anchor="middle" class="score-number" id="scoreText">0%</text>
+              <text x="60" y="72" text-anchor="middle" class="score-sub-text">Match</text>
+            </svg>
+          </div>
+          <div class="score-label">
+            <p id="scoreDescription">Analyzing your resume against the job description…</p>
+          </div>
+        </div>
+
+        <!-- Details: Strengths / Improvements -->
+        <div class="resume-details">
+          <div class="resume-section strengths-section">
+            <h4>✅ Strengths</h4>
+            <ul id="strengthsList" class="resume-list">
+              <li>Loading…</li>
+            </ul>
+          </div>
+          <div class="resume-section improvements-section">
+            <h4>🔧 Areas for Improvement</h4>
+            <ul id="improvementsList" class="resume-list">
+              <li>Loading…</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- Skills Section -->
+        <div class="skills-section">
+          <h4>🏷️ Skills Detected</h4>
+          <div class="skills-tags" id="skillsTags">
+            <!-- skill tags injected by JS -->
+          </div>
+        </div>
+
+        <div class="result-content" id="resultContent"></div>
+      </div>
+
+    </div><!-- /.tool-card -->
+  </main>
+
+  <!-- Footer -->
+  <footer id="footer">
+    <div class="footer-container">
+      <div class="footer-brand">
+        <span>SmartLens <span class="gradient-text">AI</span></span>
+        <p>Powered by advanced AI for smarter document intelligence.</p>
+      </div>
+      <div class="footer-links">
+        <div class="footer-col">
+          <h4>Tools</h4>
+          <a href="document-analyzer.html">Document Analyzer</a>
+          <a href="youtube-summarizer.html">YouTube Summarizer</a>
+          <a href="pdf-qa.html">PDF Q&amp;A</a>
+          <a href="resume-analyzer.html">Resume Analyzer</a>
+          <a href="url-analyzer.html">URL Analyzer</a>
+        </div>
+        <div class="footer-col">
+          <h4>Account</h4>
+          <a href="login.html">Login</a>
+          <a href="register.html">Register</a>
+          <a href="dashboard.html">Dashboard</a>
+        </div>
+      </div>
+    </div>
+    <div class="footer-bottom">
+      <p>&copy; 2024 SmartLens AI. All rights reserved.</p>
+    </div>
+  </footer>
+
+  <script src="js/three.min.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>

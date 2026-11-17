@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SmartLens AI – Create Account</title>
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body class="auth-page">
+
+  <!-- 3D Canvas Background -->
+  <canvas id="bg-canvas"></canvas>
+
+  <!-- Navbar (logo + Log In only) -->
+  <nav id="navbar">
+    <div class="nav-container">
+      <a href="index.html" class="nav-brand">
+        <span class="brand-icon">🔍</span>
+        <span class="brand-name">SmartLens <span class="gradient-text">AI</span></span>
+      </a>
+      <div class="nav-actions">
+        <a href="login.html" class="btn btn-outline">Log In</a>
+      </div>
+    </div>
+  </nav>
+
+  <!-- Auth Card -->
+  <main class="auth-main">
+    <div class="auth-card glass-card">
+
+      <!-- Brand Icon + Title -->
+      <div class="auth-logo">🔍</div>
+      <h1 class="auth-title">Create Account</h1>
+      <p class="auth-subtitle">Join thousands of researchers, students & professionals</p>
+
+      <!-- Step Indicator -->
+      <div class="step-indicator" role="list" aria-label="Registration steps">
+        <div class="step-item active" role="listitem" aria-current="step">
+          <div class="step-bubble">1</div>
+          <span class="step-label">Account Info</span>
+        </div>
+        <div class="step-connector"></div>
+        <div class="step-item" role="listitem">
+          <div class="step-bubble">2</div>
+          <span class="step-label">Verify</span>
+        </div>
+        <div class="step-connector"></div>
+        <div class="step-item" role="listitem">
+          <div class="step-bubble">3</div>
+          <span class="step-label">Done</span>
+        </div>
+      </div>
+
+      <!-- Error Message -->
+      <div class="form-error" id="registerError" style="display:none;" role="alert">
+        <span class="error-icon">⚠️</span>
+        <span class="error-text"></span>
+      </div>
+
+      <!-- Register Form -->
+      <form id="registerForm" class="auth-form" novalidate>
+
+        <!-- Full Name -->
+        <div class="form-group">
+          <label class="form-label" for="regName">Full Name</label>
+          <div class="input-wrapper">
+            <span class="input-icon">👤</span>
+            <input
+              type="text"
+              id="regName"
+              name="name"
+              class="form-input"
+              placeholder="Jane Smith"
+              required
+              autocomplete="name"
+            />
+          </div>
+        </div>
+
+        <!-- Email -->
+        <div class="form-group">
+          <label class="form-label" for="regEmail">Email Address</label>
+          <div class="input-wrapper">
+            <span class="input-icon">✉️</span>
+            <input
+              type="email"
+              id="regEmail"
+              name="email"
+              class="form-input"
+              placeholder="you@example.com"
+              required
+              autocomplete="email"
+            />
+          </div>
+        </div>
+
+        <!-- Password + Strength Bar -->
+        <div class="form-group">
+          <label class="form-label" for="regPassword">Password</label>
+          <div class="input-wrapper">
+            <span class="input-icon">🔒</span>
+            <input
+              type="password"
+              id="regPassword"
+              name="password"
+              class="form-input"
+              placeholder="Create a strong password"
+              required
+              autocomplete="new-password"
+              id="regPassword"
+            />
+            <button
+              type="button"
+              class="pw-toggle"
+              id="toggleRegPw"
+              aria-label="Show/hide password"
+            >👁️</button>
+          </div>
+          <div class="pw-strength-bar" aria-label="Password strength">
+            <div class="pw-strength-fill" id="pwStrengthFill"></div>
+          </div>
+          <span class="form-hint" id="pwStrengthLabel">Enter a password to see its strength</span>
+        </div>
+
+        <!-- Confirm Password -->
+        <div class="form-group">
+          <label class="form-label" for="regConfirmPassword">Confirm Password</label>
+          <div class="input-wrapper">
+            <span class="input-icon">🔒</span>
+            <input
+              type="password"
+              id="regConfirmPassword"
+              name="confirmPassword"
+              class="form-input"
+              placeholder="Re-enter your password"
+              required
+              autocomplete="new-password"
+            />
+          </div>
+        </div>
+
+        <!-- Account Type -->
+        <div class="form-group">
+          <label class="form-label" for="accountType">Account Type</label>
+          <div class="input-wrapper select-wrapper">
+            <span class="input-icon">🎓</span>
+            <select
+              id="accountType"
+              name="accountType"
+              class="form-input form-select"
+              required
+            >
+              <option value="" disabled selected>Select your role…</option>
+              <option value="general">General User</option>
+              <option value="student">Student</option>
+              <option value="researcher">Researcher</option>
+              <option value="professional">Professional</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Checkboxes -->
+        <div class="form-group checkboxes-group">
+          <label class="checkbox-label">
+            <input type="checkbox" id="termsCheck" name="terms" required />
+            <span class="checkbox-custom"></span>
+            I agree to the <a href="#" class="inline-link">Terms of Service</a> and
+            <a href="#" class="inline-link">Privacy Policy</a>
+          </label>
+          <label class="checkbox-label">
+            <input type="checkbox" id="newsletterCheck" name="newsletter" />
+            <span class="checkbox-custom"></span>
+            Send me product updates and news
+          </label>
+        </div>
+
+        <!-- Submit -->
+        <button type="submit" class="btn btn-primary full-btn" id="registerBtn">
+          <span class="btn-text">Create Account</span>
+          <span class="btn-spinner spinner" style="display:none;"></span>
+        </button>
+      </form>
+
+      <!-- OR Divider -->
+      <div class="or-divider">
+        <span class="or-line"></span>
+        <span class="or-text">OR</span>
+        <span class="or-line"></span>
+      </div>
+
+      <!-- Google Sign Up -->
+      <button type="button" class="social-btn" id="googleRegisterBtn">
+        <svg width="20" height="20" viewBox="0 0 48 48" aria-hidden="true">
+          <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>
+          <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/>
+          <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/>
+          <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/>
+          <path fill="none" d="M0 0h48v48H0z"/>
+        </svg>
+        Sign up with Google
+      </button>
+
+      <!-- Switch Link -->
+      <p class="switch-link">
+        Already have an account?
+        <a href="login.html" class="switch-anchor">Log In Here</a>
+      </p>
+
+    </div>
+  </main>
+
+  <!-- Footer -->
+  <footer id="footer">
+    <div class="footer-container">
+      <div class="footer-bottom">
+        <p>© 2024 SmartLens AI. All rights reserved.</p>
+        <div class="footer-bottom-links">
+          <a href="#">Privacy</a>
+          <a href="#">Terms</a>
+          <a href="#">Support</a>
+        </div>
+      </div>
+    </div>
+  </footer>
+
+  <script src="js/three.min.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>

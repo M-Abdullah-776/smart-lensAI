@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>URL Content Analyzer – SmartLens AI</title>
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+
+  <!-- Loader -->
+  <div id="loader">
+    <div class="loader-inner">
+      <div class="loader-logo">SmartLens <span class="gradient-text">AI</span></div>
+      <div class="loader-bar"><div class="loader-fill"></div></div>
+    </div>
+  </div>
+
+  <!-- 3D Background -->
+  <canvas id="bg-canvas"></canvas>
+
+  <!-- Navbar -->
+  <nav id="navbar">
+    <div class="nav-container">
+      <a href="index.html" class="nav-brand">SmartLens <span class="gradient-text">AI</span></a>
+      <ul class="nav-links" id="navLinks">
+        <li><a href="index.html" class="nav-link">Home</a></li>
+        <li><a href="document-analyzer.html" class="nav-link">Document Analyzer</a></li>
+        <li><a href="youtube-summarizer.html" class="nav-link">YouTube Summarizer</a></li>
+        <li><a href="pdf-qa.html" class="nav-link">PDF Q&amp;A</a></li>
+        <li><a href="resume-analyzer.html" class="nav-link">Resume Analyzer</a></li>
+        <li><a href="url-analyzer.html" class="nav-link active">URL Analyzer</a></li>
+      </ul>
+      <div class="nav-actions">
+        <a href="dashboard.html" class="btn btn-primary">Dashboard</a>
+        <button class="hamburger" id="hamburger" aria-label="Toggle menu">
+          <span></span><span></span><span></span>
+        </button>
+      </div>
+    </div>
+  </nav>
+
+  <!-- Tool Page -->
+  <main class="tool-page section-container">
+    <div class="tool-header">
+      <h1>🌐 URL Content Analyzer</h1>
+      <p class="tool-subtitle">Extract and analyze content from any webpage URL</p>
+    </div>
+
+    <div class="tool-card glass-card">
+
+      <!-- URL Input Row -->
+      <div class="url-input-row">
+        <label for="pageUrl" class="form-label">Webpage URL</label>
+        <div class="url-input-group">
+          <input
+            type="url"
+            id="pageUrl"
+            class="form-input"
+            placeholder="https://example.com/article"
+            autocomplete="off"
+          />
+          <button class="btn btn-primary" id="analyzeBtn">
+            Analyze
+          </button>
+        </div>
+      </div>
+
+      <!-- Note -->
+      <p class="url-note">
+        ⚠️ <strong>Note:</strong> Some pages may not be accessible due to login requirements or access restrictions.
+      </p>
+
+      <!-- Spinner -->
+      <div class="spinner" id="spinner" style="display:none;"></div>
+
+      <!-- Result Box -->
+      <div class="result-box" id="resultBox" style="display:none;">
+        <div class="result-header">
+          <span class="result-label">🌐 URL Analysis</span>
+          <button class="btn btn-sm btn-glass" id="copyBtn" title="Copy result">📋 Copy</button>
+        </div>
+        <div class="result-content" id="resultContent"></div>
+      </div>
+
+    </div><!-- /.tool-card -->
+  </main>
+
+  <!-- Footer -->
+  <footer id="footer">
+    <div class="footer-container">
+      <div class="footer-brand">
+        <span>SmartLens <span class="gradient-text">AI</span></span>
+        <p>Powered by advanced AI for smarter document intelligence.</p>
+      </div>
+      <div class="footer-links">
+        <div class="footer-col">
+          <h4>Tools</h4>
+          <a href="document-analyzer.html">Document Analyzer</a>
+          <a href="youtube-summarizer.html">YouTube Summarizer</a>
+          <a href="pdf-qa.html">PDF Q&amp;A</a>
+          <a href="resume-analyzer.html">Resume Analyzer</a>
+          <a href="url-analyzer.html">URL Analyzer</a>
+        </div>
+        <div class="footer-col">
+          <h4>Account</h4>
+          <a href="login.html">Login</a>
+          <a href="register.html">Register</a>
+          <a href="dashboard.html">Dashboard</a>
+        </div>
+      </div>
+    </div>
+    <div class="footer-bottom">
+      <p>&copy; 2024 SmartLens AI. All rights reserved.</p>
+    </div>
+  </footer>
+
+  <script src="js/three.min.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SmartLens AI – Dashboard</title>
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body id="dashboard-page">
+
+  <!-- Dashboard Layout: Sidebar + Main -->
+  <div class="dash-layout">
+
+    <!-- ===== SIDEBAR ===== -->
+    <aside class="dash-sidebar" id="dashSidebar">
+
+      <!-- Brand -->
+      <div class="dash-sidebar-brand">
+        <a href="index.html" class="nav-brand">
+          <span class="brand-icon">🔍</span>
+          <span class="brand-name">SmartLens <span class="gradient-text">AI</span></span>
+        </a>
+      </div>
+
+      <!-- Mobile close -->
+      <button class="sidebar-close" id="sidebarClose" aria-label="Close sidebar">✕</button>
+
+      <!-- Nav Items -->
+      <nav class="dash-nav" aria-label="Dashboard navigation">
+        <ul class="dash-nav-list">
+          <li>
+            <a href="dashboard.html" class="dash-nav-item active" aria-current="page">
+              <span class="dash-nav-icon">🏠</span>
+              <span class="dash-nav-label">Dashboard</span>
+            </a>
+          </li>
+          <li>
+            <a href="document-analyzer.html" class="dash-nav-item">
+              <span class="dash-nav-icon">📄</span>
+              <span class="dash-nav-label">Document Analyzer</span>
+            </a>
+          </li>
+          <li>
+            <a href="youtube-summarizer.html" class="dash-nav-item">
+              <span class="dash-nav-icon">▶️</span>
+              <span class="dash-nav-label">YouTube Summarizer</span>
+            </a>
+          </li>
+          <li>
+            <a href="pdf-qa.html" class="dash-nav-item">
+              <span class="dash-nav-icon">💬</span>
+              <span class="dash-nav-label">PDF Q&amp;A</span>
+            </a>
+          </li>
+          <li>
+            <a href="resume-analyzer.html" class="dash-nav-item">
+              <span class="dash-nav-icon">📋</span>
+              <span class="dash-nav-label">Resume Analyzer</span>
+            </a>
+          </li>
+          <li>
+            <a href="url-analyzer.html" class="dash-nav-item">
+              <span class="dash-nav-icon">🔗</span>
+              <span class="dash-nav-label">URL Analyzer</span>
+            </a>
+          </li>
+        </ul>
+
+        <!-- Divider -->
+        <div class="dash-nav-divider"></div>
+
+        <ul class="dash-nav-list">
+          <li>
+            <a href="login.html" class="dash-nav-item dash-nav-logout" id="logoutBtn">
+              <span class="dash-nav-icon">🚪</span>
+              <span class="dash-nav-label">Logout</span>
+            </a>
+          </li>
+        </ul>
+      </nav>
+
+      <!-- Sidebar Footer -->
+      <div class="dash-sidebar-footer">
+        <div class="user-avatar-mini">👤</div>
+        <div class="user-info-mini">
+          <span class="user-name-mini" id="sidebarUserName">User</span>
+          <span class="user-role-mini" id="sidebarUserRole">Free Plan</span>
+        </div>
+      </div>
+    </aside>
+
+    <!-- ===== MAIN CONTENT ===== -->
+    <div class="dash-content" id="dashContent">
+
+      <!-- Mobile header bar -->
+      <header class="dash-topbar">
+        <button class="sidebar-toggle" id="sidebarToggle" aria-label="Toggle sidebar">☰</button>
+        <div class="dash-topbar-info">
+          <h2 class="dash-welcome">
+            Welcome back, <span id="topbarUserName">User</span>! 👋
+          </h2>
+          <span class="dash-date" id="currentDate"></span>
+        </div>
+        <div class="dash-topbar-actions">
+          <a href="document-analyzer.html" class="btn btn-primary btn-sm">+ New Analysis</a>
+        </div>
+      </header>
+
+      <!-- ===== STATS GRID ===== -->
+      <section class="dash-section" aria-labelledby="statsHeading">
+        <h3 class="dash-section-title" id="statsHeading">Your Activity</h3>
+        <div class="dash-stats-grid">
+
+          <div class="dash-stat-card glass-card" data-stat="docs">
+            <div class="stat-icon-wrap stat-blue">📄</div>
+            <div class="stat-info">
+              <span class="stat-num" id="statDocs">0</span>
+              <span class="stat-label">Docs Analyzed</span>
+            </div>
+            <a href="document-analyzer.html" class="stat-link" aria-label="Open Document Analyzer">→</a>
+          </div>
+
+          <div class="dash-stat-card glass-card" data-stat="videos">
+            <div class="stat-icon-wrap stat-red">▶️</div>
+            <div class="stat-info">
+              <span class="stat-num" id="statVideos">0</span>
+              <span class="stat-label">Videos Summarized</span>
+            </div>
+            <a href="youtube-summarizer.html" class="stat-link" aria-label="Open YouTube Summarizer">→</a>
+          </div>
+
+          <div class="dash-stat-card glass-card" data-stat="qa">
+            <div class="stat-icon-wrap stat-purple">💬</div>
+            <div class="stat-info">
+              <span class="stat-num" id="statQA">0</span>
+              <span class="stat-label">PDF Q&amp;As</span>
+            </div>
+            <a href="pdf-qa.html" class="stat-link" aria-label="Open PDF Q&A">→</a>
+          </div>
+
+          <div class="dash-stat-card glass-card" data-stat="resumes">
+            <div class="stat-icon-wrap stat-green">📋</div>
+            <div class="stat-info">
+              <span class="stat-num" id="statResumes">0</span>
+              <span class="stat-label">Resumes Analyzed</span>
+            </div>
+            <a href="resume-analyzer.html" class="stat-link" aria-label="Open Resume Analyzer">→</a>
+          </div>
+
+          <div class="dash-stat-card glass-card" data-stat="urls">
+            <div class="stat-icon-wrap stat-cyan">🔗</div>
+            <div class="stat-info">
+              <span class="stat-num" id="statURLs">0</span>
+              <span class="stat-label">URLs Analyzed</span>
+            </div>
+            <a href="url-analyzer.html" class="stat-link" aria-label="Open URL Analyzer">→</a>
+          </div>
+
+        </div>
+      </section>
+
+      <!-- ===== FEATURE SHORTCUTS ===== -->
+      <section class="dash-section" aria-labelledby="toolsHeading">
+        <h3 class="dash-section-title" id="toolsHeading">AI Tools</h3>
+        <div class="dash-tools-grid">
+
+          <a href="document-analyzer.html" class="dash-tool-card glass-card">
+            <div class="tool-card-icon">📄</div>
+            <div class="tool-card-info">
+              <h4 class="tool-card-title">Document Analyzer</h4>
+              <p class="tool-card-desc">Upload PDF, DOCX, or TXT to get an instant AI-generated summary</p>
+            </div>
+            <span class="tool-card-arrow">→</span>
+          </a>
+
+          <a href="youtube-summarizer.html" class="dash-tool-card glass-card">
+            <div class="tool-card-icon">▶️</div>
+            <div class="tool-card-info">
+              <h4 class="tool-card-title">YouTube Summarizer</h4>
+              <p class="tool-card-desc">Paste a YouTube link and get a structured summary with key points</p>
+            </div>
+            <span class="tool-card-arrow">→</span>
+          </a>
+
+          <a href="pdf-qa.html" class="dash-tool-card glass-card">
+            <div class="tool-card-icon">💬</div>
+            <div class="tool-card-info">
+              <h4 class="tool-card-title">PDF Q&amp;A</h4>
+              <p class="tool-card-desc">Upload a PDF and ask questions — get AI-powered contextual answers</p>
+            </div>
+            <span class="tool-card-arrow">→</span>
+          </a>
+
+          <a href="resume-analyzer.html" class="dash-tool-card glass-card">
+            <div class="tool-card-icon">📋</div>
+            <div class="tool-card-info">
+              <h4 class="tool-card-title">Resume Analyzer</h4>
+              <p class="tool-card-desc">Get your resume scored against a job description with improvement tips</p>
+            </div>
+            <span class="tool-card-arrow">→</span>
+          </a>
+
+          <a href="url-analyzer.html" class="dash-tool-card glass-card">
+            <div class="tool-card-icon">🔗</div>
+            <div class="tool-card-info">
+              <h4 class="tool-card-title">URL Analyzer</h4>
+              <p class="tool-card-desc">Paste any web URL to get a smart summary and key takeaways</p>
+            </div>
+            <span class="tool-card-arrow">→</span>
+          </a>
+
+        </div>
+      </section>
+
+      <!-- ===== RECENT ACTIVITY TABLE ===== -->
+      <section class="dash-section" aria-labelledby="activityHeading">
+        <div class="section-header-row">
+          <h3 class="dash-section-title" id="activityHeading">Recent Activity</h3>
+          <button class="btn btn-glass btn-sm" id="clearHistoryBtn">Clear All</button>
+        </div>
+
+        <!-- Table (shown when history exists) -->
+        <div class="dash-table-wrap glass-card" id="activityTableWrap">
+          <table class="dash-table" id="activityTable" aria-label="Recent activity history">
+            <thead>
+              <tr>
+                <th scope="col">#</th>
+                <th scope="col">Feature</th>
+                <th scope="col">Input</th>
+                <th scope="col">Date</th>
+                <th scope="col">Status</th>
+                <th scope="col">Action</th>
+              </tr>
+            </thead>
+            <tbody id="activityTableBody">
+              <!-- Rows injected by app.js -->
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Empty State (shown when no history) -->
+        <div class="dash-empty-state glass-card" id="activityEmptyState">
+          <div class="empty-icon">🧪</div>
+          <h4 class="empty-title">No activity yet</h4>
+          <p class="empty-desc">Use one of the AI tools above to start analyzing. Your results will appear here.</p>
+          <a href="document-analyzer.html" class="btn btn-primary">Start Analyzing</a>
+        </div>
+
+      </section>
+
+      <!-- Footer inside main -->
+      <footer class="dash-footer">
+        <p>© 2024 SmartLens AI · All rights reserved · <a href="#">Privacy</a> · <a href="#">Terms</a></p>
+      </footer>
+
+    </div><!-- /dash-content -->
+  </div><!-- /dash-layout -->
+
+  <script src="js/app.js"></script>
+</body>
+</html>
