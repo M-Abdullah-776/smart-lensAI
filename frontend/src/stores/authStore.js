@@ -26,7 +26,10 @@ export const useAuthStore = create((set, get) => ({
       return { success: true };
     } catch (err) {
       set({ isLoading: false });
-      const message = err.response?.data?.detail || (err.response ? 'Invalid email or password.' : 'Cannot connect to backend server. The server may be starting up — please wait a moment and try again.');
+      const message =
+        err.response?.data?.detail ||
+        err.response?.data?.error ||
+        (err.response ? 'Invalid email or password.' : 'Cannot connect to backend server. The server may be starting up — please wait a moment and try again.');
       return { success: false, error: message };
     }
   },

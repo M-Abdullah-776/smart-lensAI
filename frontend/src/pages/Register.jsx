@@ -67,7 +67,7 @@ export const Register = () => {
       if (!err.response) {
         setError('Cannot connect to backend server. The backend may be waking up — please wait a moment and try again.');
       } else {
-        setError(err.response?.data?.detail || 'Registration failed. Please try again.');
+        setError(err.response?.data?.detail || err.response?.data?.error || 'Registration failed. Please try again.');
       }
     } finally {
       setLoading(false);
