@@ -36,6 +36,10 @@ class Settings(BaseSettings):
     ADMIN_EMAIL: str = "admin@smartlens.ai"
     ADMIN_PASSWORD: str = "Admin@12345"
     
+    GOOGLE_CLIENT_ID: str = ""
+    GOOGLE_CLIENT_SECRET: str = ""
+    GOOGLE_REDIRECT_URI: str = ""
+    
     MAX_UPLOAD_SIZE_MB: int = 10
     DAILY_AI_REQUEST_LIMIT: int = 50
     CORS_ORIGINS: str = "*"

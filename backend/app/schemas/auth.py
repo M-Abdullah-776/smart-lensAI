@@ -44,9 +44,14 @@ class UserOut(BaseModel):
     is_verified: bool
     created_at: datetime
     daily_requests_used: int
+    auth_provider: Optional[str] = "local"
+    avatar_url: Optional[str] = None
 
     class Config:
         from_attributes = True
+
+class GoogleAuthRequest(BaseModel):
+    credential: str = Field(..., description="Google ID Token from Google Identity Services")
 
 class TokenResponse(BaseModel):
     access_token: str

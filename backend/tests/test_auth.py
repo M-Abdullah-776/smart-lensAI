@@ -5,9 +5,11 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import httpx
 from app.main import app
 from app.config import settings
+from app.database import init_db
 
 async def run_auth_tests():
     print("=== STARTING PHASE 2 AUTHENTICATION SUITE ===")
+    await init_db()
     transport = httpx.ASGITransport(app=app)
     async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
         # Test 1: Health check

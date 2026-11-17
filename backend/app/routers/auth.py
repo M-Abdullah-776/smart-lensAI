@@ -1,8 +1,11 @@
 from fastapi import APIRouter, Depends, status, Request, Response
+from fastapi.responses import RedirectResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, update, delete
 from datetime import datetime, timezone, timedelta
 from typing import Optional
+from urllib.parse import urlencode
+import httpx
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 
@@ -18,7 +21,8 @@ from app.schemas.auth import (
     TokenRefreshRequest,
     PasswordResetRequest,
     PasswordResetConfirm,
-    UserUpdate
+    UserUpdate,
+    GoogleAuthRequest
 )
 from app.utils.security import (
     hash_password,
@@ -275,3 +279,226 @@ async def update_profile(
     await db.commit()
     await db.refresh(current_user)
     return UserOut.model_validate(current_user)
+
+@router.get("/google/url")
+async def get_google_auth_url():
+    """Returns the Google OAuth consent URL for frontend redirection."""
+    if not settings.GOOGLE_CLIENT_ID or not settings.GOOGLE_CLIENT_SECRET:
+        raise SmartLensException(
+            status.HTTP_503_SERVICE_UNAVAILABLE,
+            "Google OAuth is not configured on the server. Please set GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET in environment variables."
+        )
+    redirect_uri = settings.GOOGLE_REDIRECT_URI or "https://smart-lensai.onrender.com/auth/google/callback"
+    params = {
+        "client_id": settings.GOOGLE_CLIENT_ID,
+        "redirect_uri": redirect_uri,
+        "response_type": "code",
+        "scope": "openid email profile",
+        "access_type": "offline",
+        "prompt": "select_account"
+    }
+    return {"url": f"https://accounts.google.com/o/oauth2/v2/auth?{urlencode(params)}"}
+
+@router.get("/google/login")
+async def google_login():
+    """Direct redirect to Google OAuth consent screen."""
+    if not settings.GOOGLE_CLIENT_ID or not settings.GOOGLE_CLIENT_SECRET:
+        raise SmartLensException(
+            status.HTTP_503_SERVICE_UNAVAILABLE,
+            "Google OAuth is not configured on the server. Please set GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET."
+        )
+    redirect_uri = settings.GOOGLE_REDIRECT_URI or "https://smart-lensai.onrender.com/auth/google/callback"
+    params = {
+        "client_id": settings.GOOGLE_CLIENT_ID,
+        "redirect_uri": redirect_uri,
+        "response_type": "code",
+        "scope": "openid email profile",
+        "access_type": "offline",
+        "prompt": "select_account"
+    }
+    return RedirectResponse(f"https://accounts.google.com/o/oauth2/v2/auth?{urlencode(params)}")
+
+@router.get("/google/callback")
+async def google_callback(
+    code: Optional[str] = None,
+    error: Optional[str] = None,
+    db: AsyncSession = Depends(get_db)
+):
+    """Google OAuth callback: exchanges authorization code, verifies identity, creates/updates user in database, and issues application JWT tokens."""
+    frontend_url = settings.FRONTEND_URL or "https://smart-lens-ai.vercel.app"
+    if error or not code:
+        return RedirectResponse(f"{frontend_url}/login?error=google_auth_failed")
+
+    if not settings.GOOGLE_CLIENT_ID or not settings.GOOGLE_CLIENT_SECRET:
+        return RedirectResponse(f"{frontend_url}/login?error=google_oauth_not_configured")
+
+    redirect_uri = settings.GOOGLE_REDIRECT_URI or "https://smart-lensai.onrender.com/auth/google/callback"
+
+    try:
+        async with httpx.AsyncClient(timeout=20.0) as client:
+            token_res = await client.post(
+                "https://oauth2.googleapis.com/token",
+                data={
+                    "code": code,
+                    "client_id": settings.GOOGLE_CLIENT_ID,
+                    "client_secret": settings.GOOGLE_CLIENT_SECRET,
+                    "redirect_uri": redirect_uri,
+                    "grant_type": "authorization_code",
+                }
+            )
+            if token_res.status_code != 200:
+                return RedirectResponse(f"{frontend_url}/login?error=token_exchange_failed")
+
+            token_data = token_res.json()
+            access_token_google = token_data.get("access_token")
+
+            userinfo_res = await client.get(
+                "https://www.googleapis.com/oauth2/v3/userinfo",
+                headers={"Authorization": f"Bearer {access_token_google}"}
+            )
+            if userinfo_res.status_code != 200:
+                return RedirectResponse(f"{frontend_url}/login?error=userinfo_failed")
+
+            userinfo = userinfo_res.json()
+
+        google_id = userinfo.get("sub")
+        email = userinfo.get("email", "").lower()
+        full_name = userinfo.get("name") or (email.split("@")[0] if email else "Google User")
+        avatar_url = userinfo.get("picture")
+
+        if not email:
+            return RedirectResponse(f"{frontend_url}/login?error=no_email_provided")
+
+        # Safely find existing user by google_id or email
+        user_query = await db.execute(select(User).where((User.google_id == google_id) | (User.email == email)))
+        user = user_query.scalar_one_or_none()
+
+        if user:
+            if not user.google_id:
+                user.google_id = google_id
+            if avatar_url and not user.avatar_url:
+                user.avatar_url = avatar_url
+            user.is_verified = True
+            user.last_login = datetime.now(timezone.utc)
+        else:
+            user = User(
+                email=email,
+                full_name=full_name,
+                google_id=google_id,
+                avatar_url=avatar_url,
+                auth_provider="google",
+                is_active=True,
+                is_verified=True,
+                last_login=datetime.now(timezone.utc)
+            )
+            db.add(user)
+
+        await db.commit()
+        await db.refresh(user)
+
+        # Issue SmartLens JWT access and refresh tokens
+        app_access_token = create_access_token({"sub": str(user.id), "role": user.role.value})
+        app_refresh_token = create_refresh_token({"sub": str(user.id)})
+
+        rt_hash = hash_token(app_refresh_token)
+        expires_at = datetime.now(timezone.utc) + timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS)
+        db.add(RefreshToken(user_id=user.id, token_hash=rt_hash, expires_at=expires_at))
+        await db.commit()
+
+        redirect_target = f"{frontend_url}/login?token={app_access_token}&refresh_token={app_refresh_token}"
+        resp = RedirectResponse(redirect_target, status_code=status.HTTP_302_FOUND)
+        resp.set_cookie(
+            key="smartlens_refresh_token",
+            value=app_refresh_token,
+            httponly=True,
+            secure=True,
+            samesite="lax",
+            max_age=settings.REFRESH_TOKEN_EXPIRE_DAYS * 86400,
+            path="/"
+        )
+        return resp
+    except Exception as exc:
+        return RedirectResponse(f"{frontend_url}/login?error=google_callback_exception")
+
+@router.post("/google", response_model=TokenResponse)
+async def google_auth_credential(
+    payload: GoogleAuthRequest,
+    response: Response,
+    db: AsyncSession = Depends(get_db)
+):
+    """Google Identity Services ID Token credential exchange endpoint."""
+    try:
+        async with httpx.AsyncClient(timeout=15.0) as client:
+            verify_res = await client.get(
+                f"https://oauth2.googleapis.com/tokeninfo?id_token={payload.credential}"
+            )
+            if verify_res.status_code != 200:
+                raise SmartLensException(status.HTTP_401_UNAUTHORIZED, "Invalid or expired Google credential.")
+
+            id_info = verify_res.json()
+    except SmartLensException:
+        raise
+    except Exception as exc:
+        raise SmartLensException(status.HTTP_500_INTERNAL_SERVER_ERROR, f"Google token verification failed: {str(exc)}")
+
+    # Verify audience if GOOGLE_CLIENT_ID is configured
+    if settings.GOOGLE_CLIENT_ID and id_info.get("aud") != settings.GOOGLE_CLIENT_ID:
+        raise SmartLensException(status.HTTP_401_UNAUTHORIZED, "Google credential audience mismatch.")
+
+    google_id = id_info.get("sub")
+    email = id_info.get("email", "").lower()
+    full_name = id_info.get("name") or (email.split("@")[0] if email else "Google User")
+    avatar_url = id_info.get("picture")
+
+    if not email:
+        raise SmartLensException(status.HTTP_400_BAD_REQUEST, "Google credential has no associated email address.")
+
+    user_query = await db.execute(select(User).where((User.google_id == google_id) | (User.email == email)))
+    user = user_query.scalar_one_or_none()
+
+    if user:
+        if not user.google_id:
+            user.google_id = google_id
+        if avatar_url and not user.avatar_url:
+            user.avatar_url = avatar_url
+        user.is_verified = True
+        user.last_login = datetime.now(timezone.utc)
+    else:
+        user = User(
+            email=email,
+            full_name=full_name,
+            google_id=google_id,
+            avatar_url=avatar_url,
+            auth_provider="google",
+            is_active=True,
+            is_verified=True,
+            last_login=datetime.now(timezone.utc)
+        )
+        db.add(user)
+
+    await db.commit()
+    await db.refresh(user)
+
+    access_token = create_access_token({"sub": str(user.id), "role": user.role.value})
+    refresh_token = create_refresh_token({"sub": str(user.id)})
+
+    rt_hash = hash_token(refresh_token)
+    expires_at = datetime.now(timezone.utc) + timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS)
+    db.add(RefreshToken(user_id=user.id, token_hash=rt_hash, expires_at=expires_at))
+    await db.commit()
+
+    response.set_cookie(
+        key="smartlens_refresh_token",
+        value=refresh_token,
+        httponly=True,
+        secure=True,
+        samesite="lax",
+        max_age=settings.REFRESH_TOKEN_EXPIRE_DAYS * 86400,
+        path="/"
+    )
+
+    return TokenResponse(
+        access_token=access_token,
+        refresh_token=refresh_token,
+        user=UserOut.model_validate(user)
+    )

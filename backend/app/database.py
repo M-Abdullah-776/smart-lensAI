@@ -41,3 +41,15 @@ async def init_db():
     async with engine.begin() as conn:
         from app.models import user, analysis, admin, session  # noqa: F401
         await conn.run_sync(Base.metadata.create_all)
+
+        # Micro-migrations for newly added columns to existing tables
+        from sqlalchemy import text
+        for col_def in [
+            "ALTER TABLE users ADD COLUMN auth_provider VARCHAR(50) DEFAULT 'local'",
+            "ALTER TABLE users ADD COLUMN google_id VARCHAR(255)",
+            "ALTER TABLE users ADD COLUMN avatar_url VARCHAR(1024)",
+        ]:
+            try:
+                await conn.execute(text(col_def))
+            except Exception:
+                pass
