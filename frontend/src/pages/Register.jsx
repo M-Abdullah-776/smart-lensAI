@@ -62,15 +62,12 @@ export const Register = () => {
       });
       setSuccessMessage(res.data.message || 'Registration successful!');
     } catch (err) {
-      const targetUrl = api.defaults.baseURL
-        ? `${api.defaults.baseURL}/auth/register`
-        : window.location.origin + '/auth/register';
-      console.error('Registration failed while contacting:', targetUrl, err);
+      console.error('Registration failed:', err);
 
       if (!err.response) {
-        setError(`Cannot connect to backend at: ${targetUrl}. (Make sure VITE_API_URL starts with https:// and matches your Render URL).`);
+        setError('Cannot connect to backend server. Please verify that your Render backend is Live and VITE_API_URL is configured on Vercel.');
       } else {
-        setError(err.response?.data?.detail || 'Registration failed. Please check your details.');
+        setError(err.response?.data?.detail || 'Registration failed. Please try again.');
       }
     } finally {
       setLoading(false);

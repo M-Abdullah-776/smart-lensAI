@@ -1,19 +1,19 @@
 {
   "rewrites": [
     {
-      "source": "/api/:match*",
-      "destination": "https://smart-lensai.onrender.com/api/:match*"
+      "source": "/auth/:path*",
+      "destination": "https://smart-lensai.onrender.com/auth/:path*"
     },
     {
-      "source": "/auth/:match*",
-      "destination": "https://smart-lensai.onrender.com/auth/:match*"
+      "source": "/api/:path*",
+      "destination": "https://smart-lensai.onrender.com/api/:path*"
     },
     {
-      "source": "/admin/:match*",
-      "destination": "https://smart-lensai.onrender.com/admin/:match*"
+      "source": "/admin/:path*",
+      "destination": "https://smart-lensai.onrender.com/admin/:path*"
     },
     {
-      "source": "/(.*)",
+      "source": "/((?!auth|api|admin).*)",
       "destination": "/index.html"
     }
   ]
