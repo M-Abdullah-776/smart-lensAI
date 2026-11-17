@@ -1,9 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Navbar } from '../components/Navbar';
 import { ParticleBackground } from '../components/ParticleBackground';
 import api from '../services/api';
-import { User, Mail, Lock, Eye, EyeOff, CheckCircle2, AlertCircle, ArrowRight, Loader2 } from 'lucide-react';
+import { User, Mail, Lock, Eye, EyeOff, CheckCircle2, AlertCircle, ArrowRight } from 'lucide-react';
 
 export const Register = () => {
   const [fullName, setFullName] = useState('');
@@ -12,30 +12,10 @@ export const Register = () => {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [termsAccepted, setTermsAccepted] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
-
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
-  const [backendReady, setBackendReady] = useState(null); // null=checking, true=ready, false=waking
 
-  // Ping backend on mount to warm it up
-  useEffect(() => {
-    const ping = async () => {
-      try {
-        await api.get('/api/health');
-        setBackendReady(true);
-      } catch {
-        setBackendReady(false);
-        // Retry once after 8 seconds
-        setTimeout(async () => {
-          try { await api.get('/api/health'); setBackendReady(true); } catch { setBackendReady(false); }
-        }, 8000);
-      }
-    };
-    ping();
-  }, []);
-
-  // Password strength calculation
   const getPasswordStrength = (pass) => {
     let score = 0;
     if (pass.length >= 8) score++;
@@ -58,12 +38,10 @@ export const Register = () => {
       setError('Passwords do not match.');
       return;
     }
-
     if (password.length < 8 || !/[A-Za-z]/.test(password) || !/[0-9]/.test(password)) {
-      setError('Password must be at least 8 characters long and contain both letters and numbers.');
+      setError('Password must be at least 8 characters and contain letters and numbers.');
       return;
     }
-
     if (!termsAccepted) {
       setError('Please agree to the Terms of Service to continue.');
       return;
@@ -80,12 +58,13 @@ export const Register = () => {
       });
       setSuccessMessage(res.data.message || 'Registration successful!');
     } catch (err) {
-      console.error('Registration failed:', err);
-
-      if (!err.response) {
-        setError('Cannot connect to backend server. The backend may be waking up — please wait a moment and try again.');
+      const detail = err.response?.data?.detail;
+      if (detail) {
+        setError(detail);
+      } else if (!err.response) {
+        setError('Could not reach the server. Please try again in a moment.');
       } else {
-        setError(err.response?.data?.detail || err.response?.data?.error || 'Registration failed. Please try again.');
+        setError('Registration failed. Please try again.');
       }
     } finally {
       setLoading(false);
@@ -109,44 +88,24 @@ export const Register = () => {
             <div className="flex items-center gap-2">
               <div className={`w-7 h-7 rounded-full text-xs font-bold flex items-center justify-center ${
                 fullName && email ? 'bg-indigo-600 text-white' : 'bg-white/10 text-slate-400'
-              }`}>
-                1
-              </div>
+              }`}>1</div>
               <span className="text-xs font-medium text-slate-300 hidden sm:inline">Identity</span>
             </div>
             <div className="flex-1 h-0.5 mx-2 bg-white/10" />
             <div className="flex items-center gap-2">
               <div className={`w-7 h-7 rounded-full text-xs font-bold flex items-center justify-center ${
                 password && confirmPassword ? 'bg-indigo-600 text-white' : 'bg-white/10 text-slate-400'
-              }`}>
-                2
-              </div>
+              }`}>2</div>
               <span className="text-xs font-medium text-slate-300 hidden sm:inline">Security</span>
             </div>
             <div className="flex-1 h-0.5 mx-2 bg-white/10" />
             <div className="flex items-center gap-2">
               <div className={`w-7 h-7 rounded-full text-xs font-bold flex items-center justify-center ${
                 termsAccepted ? 'bg-indigo-600 text-white' : 'bg-white/10 text-slate-400'
-              }`}>
-                3
-              </div>
+              }`}>3</div>
               <span className="text-xs font-medium text-slate-300 hidden sm:inline">Verify</span>
             </div>
           </div>
-
-          {/* Backend Status Banner */}
-          {backendReady === false && (
-            <div className="mb-4 p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-300 text-xs flex items-center gap-2">
-              <Loader2 className="w-4 h-4 flex-shrink-0 animate-spin" />
-              <span>Server is waking up (free tier cold start). This takes ~20 seconds — please wait before submitting.</span>
-            </div>
-          )}
-          {backendReady === true && (
-            <div className="mb-4 p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-300 text-xs flex items-center gap-2">
-              <CheckCircle2 className="w-4 h-4 flex-shrink-0" />
-              <span>Server is online and ready.</span>
-            </div>
-          )}
 
           {error && (
             <div className="mb-6 p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-300 text-xs flex items-center gap-2">
