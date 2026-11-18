@@ -1,10 +1,13 @@
 import re
 import json
+import logging
 import httpx
 from typing import Dict, Any, Optional, Tuple, List
 from youtube_transcript_api import YouTubeTranscriptApi, TranscriptsDisabled, NoTranscriptFound, VideoUnavailable
 from app.services.ai_service import ai_service
 from app.utils.responses import SmartLensException, AI_DISCLAIMER
+
+logger = logging.getLogger("smartlens.youtube")
 
 YOUTUBE_REGEX = re.compile(
     r'(?:https?:\/\/)?(?:www\.)?(?:youtube\.com\/(?:watch\?v=|embed\/|shorts\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})'
@@ -130,36 +133,54 @@ async def summarize_youtube_video(url: str) -> Dict[str, Any]:
         )
 
     metadata = await fetch_video_metadata(video_id)
-    transcript_text, segments = fetch_transcript(video_id)
+    canonical_url = f"https://www.youtube.com/watch?v={video_id}"
 
-    # If transcript is very long, sample or summarize segments
-    text_sample = transcript_text[:18000]
+    # Step 1: Attempt to fetch transcript
+    transcript_text = None
+    segments = []
+    try:
+        transcript_text, segments = fetch_transcript(video_id)
+    except Exception as transcript_err:
+        logger.warning(
+            f"Transcript fetching from server IP unavailable ({transcript_err}). "
+            "Falling back to Gemini native multimodal YouTube processing."
+        )
 
-    prompt = f"""
-You are an expert video content analyst. Analyze the following timestamped video transcript and return ONLY pure JSON (no markdown formatting).
-
-Video Title: {metadata['title']}
-Channel: {metadata['author_name']}
-
-Transcript:
-{text_sample}
-
-Output format required (pure JSON):
-{{
-  "summary": "Comprehensive 2-4 paragraph overview of the video's core content...",
+    prompt_schema = """You are an expert video content analyst. Analyze this video and return ONLY pure JSON (no markdown formatting, no code fences):
+{
+  "summary": "Comprehensive 2-4 paragraph overview of the video's core content, background, and conclusions...",
   "key_points_with_timestamps": [
-    {{"timestamp": "01:23", "point": "Description of concept discussed..."}},
-    {{"timestamp": "04:50", "point": "Another key topic covered..."}}
+    {"timestamp": "01:23", "point": "Description of concept or event discussed..."},
+    {"timestamp": "04:50", "point": "Another key topic covered..."}
   ],
   "takeaways": [
     "Practical actionable takeaway 1",
     "Practical actionable takeaway 2",
     "Practical actionable takeaway 3"
   ]
-}}
-"""
-    raw_response = await ai_service.generate(prompt, temperature=0.3)
-    
+}"""
+
+    if transcript_text and transcript_text.strip():
+        text_sample = transcript_text[:20000]
+        prompt = f"""Video Title: {metadata['title']}
+Channel: {metadata['author_name']}
+
+Transcript:
+{text_sample}
+
+{prompt_schema}"""
+        raw_response = await ai_service.generate(prompt, temperature=0.3)
+        word_count = len(transcript_text.split())
+    else:
+        # Seamless fallback: Gemini natively ingests and analyzes the YouTube video directly via Google's internal link!
+        # This completely bypasses datacenter IP blocks, rate limits, and missing captions.
+        parts = [
+            {"file_data": {"mime_type": "video/mp4", "file_uri": canonical_url}},
+            {"text": f"Video Title: {metadata['title']}\nChannel: {metadata['author_name']}\n\n{prompt_schema}"}
+        ]
+        raw_response = await ai_service.generate(parts, temperature=0.3)
+        word_count = 0
+
     cleaned = raw_response.strip()
     if cleaned.startswith("```json"):
         cleaned = cleaned[7:]
@@ -168,6 +189,12 @@ Output format required (pure JSON):
     if cleaned.endswith("```"):
         cleaned = cleaned[:-3]
     cleaned = cleaned.strip()
+
+    if not (cleaned.startswith("{") and cleaned.endswith("}")):
+        import re
+        match = re.search(r"\{.*\}", cleaned, re.DOTALL)
+        if match:
+            cleaned = match.group(0)
 
     try:
         parsed = json.loads(cleaned)
@@ -178,14 +205,29 @@ Output format required (pure JSON):
             "takeaways": []
         }
 
+    # Normalize key_points (handle timestamp/point or time/label or time/description)
+    raw_kp = parsed.get("key_points_with_timestamps", []) or parsed.get("key_points", [])
+    normalized_kp = []
+    for item in raw_kp:
+        if isinstance(item, dict):
+            ts = item.get("timestamp") or item.get("time") or "00:00"
+            pt = item.get("point") or item.get("label") or item.get("description") or str(item)
+            normalized_kp.append({"timestamp": ts, "point": pt})
+        elif isinstance(item, str):
+            normalized_kp.append({"timestamp": "00:00", "point": item})
+
+    raw_takeaways = parsed.get("takeaways", [])
+    if isinstance(raw_takeaways, str):
+        raw_takeaways = [raw_takeaways]
+
     return {
         "video_id": video_id,
         "title": metadata["title"],
         "channel": metadata["author_name"],
         "thumbnail": metadata["thumbnail_url"],
-        "summary": parsed.get("summary", ""),
-        "key_points_with_timestamps": parsed.get("key_points_with_timestamps", []),
-        "takeaways": parsed.get("takeaways", []),
-        "word_count": len(transcript_text.split()),
+        "summary": parsed.get("summary", "").strip() or raw_response.strip(),
+        "key_points_with_timestamps": normalized_kp,
+        "takeaways": raw_takeaways,
+        "word_count": word_count,
         "ai_disclaimer": AI_DISCLAIMER
     }

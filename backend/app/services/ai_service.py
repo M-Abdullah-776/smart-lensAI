@@ -1,6 +1,6 @@
 import asyncio
 import logging
-from typing import Optional
+from typing import Optional, Union, List, Dict, Any
 from app.config import settings
 from app.utils.responses import SmartLensException
 
@@ -19,9 +19,9 @@ class AIService:
     def model(self) -> str:
         return (settings.AI_MODEL or "gemini-1.5-flash").strip()
 
-    async def generate(self, prompt: str, temperature: float = 0.3, max_tokens: int = 4096) -> str:
+    async def generate(self, prompt: Union[str, List[Dict[str, Any]]], temperature: float = 0.3, max_tokens: int = 4096) -> str:
         """
-        Unified provider-agnostic text generation with exponential backoff retries.
+        Unified provider-agnostic text and multimodal generation with exponential backoff retries.
         """
         if not self.api_key:
             raise SmartLensException(
@@ -63,10 +63,11 @@ class AIService:
                         )
                 await asyncio.sleep(backoff ** (attempt + 1))
 
-    async def _generate_gemini(self, prompt: str, temperature: float, max_tokens: int) -> str:
+    async def _generate_gemini(self, prompt: Union[str, List[Dict[str, Any]]], temperature: float, max_tokens: int) -> str:
         """
         Direct REST client for Google Generative Language API.
         Avoids the deprecated google-generativeai SDK gRPC deadlock and timeout issues.
+        Supports both text prompts and multimodal parts (e.g. YouTube video URL or base64 images).
         """
         import httpx
 
@@ -74,10 +75,15 @@ class AIService:
         if model_name.startswith("models/"):
             model_name = model_name.replace("models/", "")
 
+        if isinstance(prompt, list):
+            parts = prompt
+        else:
+            parts = [{"text": str(prompt)}]
+
         payload = {
             "contents": [
                 {
-                    "parts": [{"text": prompt}]
+                    "parts": parts
                 }
             ],
             "generationConfig": {
@@ -117,7 +123,22 @@ class AIService:
                         err_msg = res.text
                     last_error = err_msg
 
-                    if err_code == 429:
+                    if err_code == 503:
+                        logger.warning(f"Gemini model {model_candidate} reported high demand (503), retrying in 1.5s...")
+                        await asyncio.sleep(1.5)
+                        try:
+                            retry_res = await client.post(url, json=payload, headers={"Content-Type": "application/json"})
+                            if retry_res.status_code == 200:
+                                data = retry_res.json()
+                                candidates_data = data.get("candidates", [])
+                                if candidates_data and "content" in candidates_data[0]:
+                                    parts = candidates_data[0]["content"].get("parts", [])
+                                    if parts and "text" in parts[0]:
+                                        return parts[0]["text"]
+                        except Exception:
+                            pass
+                        continue
+                    elif err_code == 429:
                         hit_quota = True
                         logger.warning(f"Gemini model {model_candidate} exceeded quota (429), trying next candidate...")
                         continue
@@ -126,8 +147,8 @@ class AIService:
                             401,
                             "Invalid Gemini API Key. Please verify your AI_API_KEY in Render environment settings."
                         )
-                    elif err_code == 404 or err_code == 503:
-                        logger.warning(f"Gemini model {model_candidate} returned {err_code}, trying next candidate...")
+                    elif err_code == 404:
+                        logger.warning(f"Gemini model {model_candidate} returned 404, trying next candidate...")
                         continue
                     else:
                         logger.warning(f"Gemini API returned {err_code} for {model_candidate}: {err_msg[:200]}")
@@ -152,25 +173,27 @@ class AIService:
             f"Gemini AI error: {last_error[:250] if last_error else 'Unable to generate content with current API key. Please check your key at https://aistudio.google.com/app/apikey'}"
         )
 
-    async def _generate_openai(self, prompt: str, temperature: float, max_tokens: int) -> str:
+    async def _generate_openai(self, prompt: Union[str, List[Dict[str, Any]]], temperature: float, max_tokens: int) -> str:
         from openai import AsyncOpenAI
         client = AsyncOpenAI(api_key=self.api_key)
         model_name = self.model if self.model else "gpt-4o-mini"
+        content = prompt if isinstance(prompt, str) else " ".join([p.get("text", "") for p in prompt if isinstance(p, dict) and "text" in p])
         response = await client.chat.completions.create(
             model=model_name,
-            messages=[{"role": "user", "content": prompt}],
+            messages=[{"role": "user", "content": content}],
             temperature=temperature,
             max_tokens=max_tokens,
         )
         return response.choices[0].message.content or ""
 
-    async def _generate_anthropic(self, prompt: str, temperature: float, max_tokens: int) -> str:
+    async def _generate_anthropic(self, prompt: Union[str, List[Dict[str, Any]]], temperature: float, max_tokens: int) -> str:
         from anthropic import AsyncAnthropic
         client = AsyncAnthropic(api_key=self.api_key)
         model_name = self.model if self.model else "claude-3-5-sonnet-20240620"
+        content = prompt if isinstance(prompt, str) else " ".join([p.get("text", "") for p in prompt if isinstance(p, dict) and "text" in p])
         response = await client.messages.create(
             model=model_name,
-            messages=[{"role": "user", "content": prompt}],
+            messages=[{"role": "user", "content": content}],
             temperature=temperature,
             max_tokens=max_tokens,
         )
