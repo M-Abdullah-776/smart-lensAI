@@ -47,44 +47,79 @@ def format_timestamp(seconds: float) -> str:
     return f"{minutes:02d}:{secs:02d}"
 
 def fetch_transcript(video_id: str) -> Tuple[str, List[Dict[str, Any]]]:
+    raw_entries = None
+    last_err = None
+
+    # 1. Try modern v1.x instance API (YouTubeTranscriptApi().fetch or .list)
     try:
-        transcript_list = YouTubeTranscriptApi.get_transcript(video_id)
-        formatted_segments = []
-        raw_text_parts = []
-        
-        for item in transcript_list:
-            text = item.get("text", "").replace("\n", " ").strip()
-            start = item.get("start", 0.0)
-            if text:
-                ts_str = format_timestamp(start)
-                formatted_segments.append({"timestamp": ts_str, "seconds": start, "text": text})
-                raw_text_parts.append(f"[{ts_str}] {text}")
-
-        combined_text = "\n".join(raw_text_parts)
-        if not combined_text.strip():
-            raise SmartLensException(
-                400,
-                "No spoken text could be extracted from this video's transcript."
-            )
-        return combined_text, formatted_segments
-
-    except (TranscriptsDisabled, NoTranscriptFound):
-        raise SmartLensException(
-            400,
-            "Transcripts or closed captions are disabled or unavailable for this video. Cannot process video without a transcript."
-        )
-    except VideoUnavailable:
-        raise SmartLensException(
-            400,
-            "This video is unavailable, private, deleted, or region-restricted."
-        )
-    except SmartLensException:
-        raise
+        yt = YouTubeTranscriptApi()
+        try:
+            raw_entries = yt.fetch(video_id)
+        except Exception as e:
+            last_err = e
+            # Try listing all available transcripts (including auto-generated & multi-language)
+            try:
+                tl = yt.list(video_id)
+                for t in tl:
+                    try:
+                        raw_entries = t.fetch()
+                        if raw_entries:
+                            break
+                    except Exception:
+                        continue
+            except Exception as e2:
+                last_err = e2
     except Exception as e:
+        last_err = e
+
+    # 2. Try legacy v0.x class methods if instance API didn't succeed
+    if not raw_entries:
+        try:
+            if hasattr(YouTubeTranscriptApi, "list_transcripts"):
+                tl = YouTubeTranscriptApi.list_transcripts(video_id)
+                for t in tl:
+                    try:
+                        raw_entries = t.fetch()
+                        if raw_entries:
+                            break
+                    except Exception:
+                        continue
+            elif hasattr(YouTubeTranscriptApi, "get_transcript"):
+                raw_entries = YouTubeTranscriptApi.get_transcript(video_id)
+        except Exception as e:
+            last_err = e
+
+    if not raw_entries:
+        err_str = str(last_err) if last_err else ""
+        if "TranscriptsDisabled" in err_str or "disabled" in err_str.lower():
+            raise SmartLensException(400, "Transcripts/captions are disabled by the creator for this video.")
+        elif "NoTranscriptFound" in err_str or "Could not find" in err_str:
+            raise SmartLensException(400, "No captions found for this video. Please select a video with English or auto-generated captions.")
+        elif "Too Many Requests" in err_str or "IpBlocked" in err_str or "blocking" in err_str.lower():
+            raise SmartLensException(429, "YouTube is temporarily rate-limiting automated caption requests from this server. Please try again shortly or test another video.")
+        elif "VideoUnavailable" in err_str or "unavailable" in err_str.lower():
+            raise SmartLensException(400, "This video is unavailable, private, or region-restricted.")
+        else:
+            raise SmartLensException(400, f"Unable to extract captions for this video: {err_str if err_str else 'No captions available'}")
+
+    formatted_segments = []
+    raw_text_parts = []
+    for item in raw_entries:
+        text = getattr(item, "text", None) or (item.get("text") if isinstance(item, dict) else str(item))
+        start = getattr(item, "start", None) or (item.get("start") if isinstance(item, dict) else 0.0)
+        if text and text.strip():
+            text = text.replace("\n", " ").strip()
+            ts_str = format_timestamp(start)
+            formatted_segments.append({"timestamp": ts_str, "seconds": start, "text": text})
+            raw_text_parts.append(f"[{ts_str}] {text}")
+
+    combined_text = "\n".join(raw_text_parts)
+    if not combined_text.strip():
         raise SmartLensException(
             400,
-            f"Unable to retrieve captions for this video. Ensure the video is public and has captions available."
+            "No spoken text could be extracted from this video's transcript."
         )
+    return combined_text, formatted_segments
 
 async def summarize_youtube_video(url: str) -> Dict[str, Any]:
     video_id = extract_video_id(url)
