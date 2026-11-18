@@ -67,12 +67,10 @@ class AIService:
         import google.generativeai as genai
         genai.configure(api_key=self.api_key)
 
-        # Normalize model name: replace legacy/unsupported gemini-1.5-pro with gemini-1.5-flash
+        # Normalize model name
         raw_model = (self.model or "gemini-1.5-flash").strip()
         if raw_model.startswith("models/"):
             raw_model = raw_model.replace("models/", "")
-        if "gemini-1.5-pro" in raw_model:
-            raw_model = "gemini-1.5-flash"
         
         generation_config = {
             "temperature": temperature,
@@ -91,19 +89,54 @@ class AIService:
             return await loop.run_in_executor(None, lambda: _call_model(raw_model))
         except Exception as exc:
             err_text = str(exc)
-            # If the model returned 404 or not found, try fallback models
             if "404" in err_text or "not found" in err_text.lower():
-                logger.warning(f"Gemini model '{raw_model}' returned 404. Attempting automatic fallback models...")
-                candidate_models = ["gemini-1.5-flash", "gemini-2.0-flash", "gemini-1.5-flash-latest", "gemini-pro"]
-                for candidate in candidate_models:
-                    if candidate == raw_model:
-                        continue
+                logger.warning(f"Model '{raw_model}' returned 404. Calling ModelService.ListModels to discover available models for this API key...")
+                
+                def _discover_and_run():
                     try:
-                        logger.info(f"Trying Gemini fallback: {candidate}")
-                        return await loop.run_in_executor(None, lambda c=candidate: _call_model(c))
-                    except Exception as fb_err:
-                        logger.warning(f"Fallback {candidate} failed: {fb_err}")
-                        continue
+                        available = []
+                        for m in genai.list_models():
+                            methods = getattr(m, "supported_generation_methods", []) or []
+                            if "generateContent" in methods:
+                                name = m.name.replace("models/", "")
+                                available.append(name)
+                        
+                        logger.info(f"Available generateContent models for this key: {available}")
+                        if not available:
+                            raise SmartLensException(
+                                502,
+                                "This API key has no enabled generateContent models. Please ensure 'Generative Language API' is enabled, or create a free key at https://aistudio.google.com/app/apikey"
+                            )
+                        
+                        # Preferred order of models
+                        priority = [
+                            "gemini-1.5-flash",
+                            "gemini-2.0-flash",
+                            "gemini-1.5-flash-latest",
+                            "gemini-1.5-flash-8b",
+                            "gemini-1.5-pro",
+                            "gemini-pro"
+                        ]
+                        selected = None
+                        for p in priority:
+                            if p in available:
+                                selected = p
+                                break
+                        if not selected:
+                            selected = available[0]
+
+                        logger.info(f"Selected working model from list_models: {selected}")
+                        return _call_model(selected)
+                    except SmartLensException:
+                        raise
+                    except Exception as discover_err:
+                        logger.error(f"Failed to discover and run fallback model: {discover_err}")
+                        raise SmartLensException(
+                            502,
+                            f"AI Model Error: {str(discover_err)}. Please generate a fresh API key at https://aistudio.google.com/app/apikey"
+                        )
+
+                return await loop.run_in_executor(None, _discover_and_run)
             raise
 
     async def _generate_openai(self, prompt: str, temperature: float, max_tokens: int) -> str:
