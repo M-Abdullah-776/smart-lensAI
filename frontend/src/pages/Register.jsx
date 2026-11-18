@@ -21,7 +21,9 @@ export const Register = () => {
     setError('');
     setOauthLoading(true);
     try {
-      const res = await api.get('/auth/google/url');
+      const res = await api.get('/auth/google/url', {
+        params: { origin: window.location.origin }
+      });
       if (res.data?.url) {
         window.location.href = res.data.url;
       }

@@ -31,7 +31,7 @@ class Settings(BaseSettings):
     SMTP_PASSWORD: str = ""
     SMTP_FROM: str = "noreply@smartlens.ai"
     EMAIL_VERIFICATION: bool = False
-    FRONTEND_URL: str = "http://localhost:5173"
+    FRONTEND_URL: str = "https://smart-lens-ai.vercel.app"
     
     ADMIN_EMAIL: str = "admin@smartlens.ai"
     ADMIN_PASSWORD: str = "Admin@12345"

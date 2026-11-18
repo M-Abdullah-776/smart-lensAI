@@ -280,8 +280,31 @@ async def update_profile(
     await db.refresh(current_user)
     return UserOut.model_validate(current_user)
 
+def get_safe_frontend_url(state: Optional[str] = None) -> str:
+    import os
+    default_url = (settings.FRONTEND_URL or "https://smart-lens-ai.vercel.app").rstrip("/")
+    if "localhost" in default_url and (os.getenv("RENDER") or os.getenv("PORT") or not os.path.exists("C:\\")):
+        default_url = "https://smart-lens-ai.vercel.app"
+
+    if state:
+        try:
+            import base64
+            import json
+            decoded = json.loads(base64.urlsafe_b64decode(state.encode()).decode())
+            candidate = decoded.get("origin", "").rstrip("/")
+            if candidate and (
+                "vercel.app" in candidate or 
+                "smartlens" in candidate or 
+                candidate.startswith("http://localhost:") or 
+                candidate.startswith("http://127.0.0.1:")
+            ):
+                return candidate
+        except Exception:
+            pass
+    return default_url
+
 @router.get("/google/url")
-async def get_google_auth_url():
+async def get_google_auth_url(origin: Optional[str] = None):
     """Returns the Google OAuth consent URL for frontend redirection."""
     if not settings.GOOGLE_CLIENT_ID or not settings.GOOGLE_CLIENT_SECRET:
         raise SmartLensException(
@@ -289,18 +312,25 @@ async def get_google_auth_url():
             "Google OAuth is not configured on the server. Please set GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET in environment variables."
         )
     redirect_uri = settings.GOOGLE_REDIRECT_URI or "https://smart-lensai.onrender.com/auth/google/callback"
+    
+    import base64
+    import json
+    safe_origin = origin or settings.FRONTEND_URL or "https://smart-lens-ai.vercel.app"
+    state_str = base64.urlsafe_b64encode(json.dumps({"origin": safe_origin}).encode()).decode()
+
     params = {
         "client_id": settings.GOOGLE_CLIENT_ID,
         "redirect_uri": redirect_uri,
         "response_type": "code",
         "scope": "openid email profile",
         "access_type": "offline",
-        "prompt": "select_account"
+        "prompt": "select_account",
+        "state": state_str
     }
     return {"url": f"https://accounts.google.com/o/oauth2/v2/auth?{urlencode(params)}"}
 
 @router.get("/google/login")
-async def google_login():
+async def google_login(origin: Optional[str] = None):
     """Direct redirect to Google OAuth consent screen."""
     if not settings.GOOGLE_CLIENT_ID or not settings.GOOGLE_CLIENT_SECRET:
         raise SmartLensException(
@@ -308,13 +338,20 @@ async def google_login():
             "Google OAuth is not configured on the server. Please set GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET."
         )
     redirect_uri = settings.GOOGLE_REDIRECT_URI or "https://smart-lensai.onrender.com/auth/google/callback"
+    
+    import base64
+    import json
+    safe_origin = origin or settings.FRONTEND_URL or "https://smart-lens-ai.vercel.app"
+    state_str = base64.urlsafe_b64encode(json.dumps({"origin": safe_origin}).encode()).decode()
+
     params = {
         "client_id": settings.GOOGLE_CLIENT_ID,
         "redirect_uri": redirect_uri,
         "response_type": "code",
         "scope": "openid email profile",
         "access_type": "offline",
-        "prompt": "select_account"
+        "prompt": "select_account",
+        "state": state_str
     }
     return RedirectResponse(f"https://accounts.google.com/o/oauth2/v2/auth?{urlencode(params)}")
 
@@ -322,10 +359,11 @@ async def google_login():
 async def google_callback(
     code: Optional[str] = None,
     error: Optional[str] = None,
+    state: Optional[str] = None,
     db: AsyncSession = Depends(get_db)
 ):
     """Google OAuth callback: exchanges authorization code, verifies identity, creates/updates user in database, and issues application JWT tokens."""
-    frontend_url = settings.FRONTEND_URL or "https://smart-lens-ai.vercel.app"
+    frontend_url = get_safe_frontend_url(state)
     if error or not code:
         return RedirectResponse(f"{frontend_url}/login?error=google_auth_failed")
 
