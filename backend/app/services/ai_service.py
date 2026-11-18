@@ -66,7 +66,13 @@ class AIService:
     async def _generate_gemini(self, prompt: str, temperature: float, max_tokens: int) -> str:
         import google.generativeai as genai
         genai.configure(api_key=self.api_key)
-        model_name = self.model or "gemini-1.5-flash"
+
+        # Normalize model name: replace legacy/unsupported gemini-1.5-pro with gemini-1.5-flash
+        raw_model = (self.model or "gemini-1.5-flash").strip()
+        if raw_model.startswith("models/"):
+            raw_model = raw_model.replace("models/", "")
+        if "gemini-1.5-pro" in raw_model:
+            raw_model = "gemini-1.5-flash"
         
         generation_config = {
             "temperature": temperature,
@@ -74,14 +80,31 @@ class AIService:
         }
         
         loop = asyncio.get_running_loop()
-        def _call():
-            model = genai.GenerativeModel(model_name=model_name, generation_config=generation_config)
+        def _call_model(target_model: str):
+            model = genai.GenerativeModel(model_name=target_model, generation_config=generation_config)
             response = model.generate_content(prompt)
             if not response or not hasattr(response, "text"):
                 raise SmartLensException(502, "The AI model returned an empty response.")
             return response.text
 
-        return await loop.run_in_executor(None, _call)
+        try:
+            return await loop.run_in_executor(None, lambda: _call_model(raw_model))
+        except Exception as exc:
+            err_text = str(exc)
+            # If the model returned 404 or not found, try fallback models
+            if "404" in err_text or "not found" in err_text.lower():
+                logger.warning(f"Gemini model '{raw_model}' returned 404. Attempting automatic fallback models...")
+                candidate_models = ["gemini-1.5-flash", "gemini-2.0-flash", "gemini-1.5-flash-latest", "gemini-pro"]
+                for candidate in candidate_models:
+                    if candidate == raw_model:
+                        continue
+                    try:
+                        logger.info(f"Trying Gemini fallback: {candidate}")
+                        return await loop.run_in_executor(None, lambda c=candidate: _call_model(c))
+                    except Exception as fb_err:
+                        logger.warning(f"Fallback {candidate} failed: {fb_err}")
+                        continue
+            raise
 
     async def _generate_openai(self, prompt: str, temperature: float, max_tokens: int) -> str:
         from openai import AsyncOpenAI
