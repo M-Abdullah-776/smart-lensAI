@@ -315,7 +315,12 @@ async def get_google_auth_url(origin: Optional[str] = None):
     
     import base64
     import json
-    safe_origin = origin or settings.FRONTEND_URL or "https://smart-lens-ai.vercel.app"
+    import os
+    default_front = "https://smart-lens-ai.vercel.app"
+    raw_front = (settings.FRONTEND_URL or default_front).rstrip("/")
+    if "localhost" in raw_front and (os.getenv("RENDER") or os.getenv("PORT") or not os.path.exists("C:\\")):
+        raw_front = default_front
+    safe_origin = origin or raw_front
     state_str = base64.urlsafe_b64encode(json.dumps({"origin": safe_origin}).encode()).decode()
 
     params = {
@@ -341,7 +346,12 @@ async def google_login(origin: Optional[str] = None):
     
     import base64
     import json
-    safe_origin = origin or settings.FRONTEND_URL or "https://smart-lens-ai.vercel.app"
+    import os
+    default_front = "https://smart-lens-ai.vercel.app"
+    raw_front = (settings.FRONTEND_URL or default_front).rstrip("/")
+    if "localhost" in raw_front and (os.getenv("RENDER") or os.getenv("PORT") or not os.path.exists("C:\\")):
+        raw_front = default_front
+    safe_origin = origin or raw_front
     state_str = base64.urlsafe_b64encode(json.dumps({"origin": safe_origin}).encode()).decode()
 
     params = {

@@ -86,13 +86,14 @@ class AIService:
             }
         }
 
-        candidates = [model_name, "gemini-flash-latest", "gemini-pro-latest", "gemini-1.5-flash", "gemini-2.0-flash"]
+        candidates = [model_name, "gemini-flash-lite-latest", "gemini-3.8-flash", "gemini-flash-latest", "gemini-2.0-flash", "gemini-1.5-flash"]
         unique_candidates = []
         for c in candidates:
             if c and c not in unique_candidates:
                 unique_candidates.append(c)
 
         last_error = ""
+        hit_quota = False
         async with httpx.AsyncClient(timeout=30.0) as client:
             for model_candidate in unique_candidates:
                 url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_candidate}:generateContent?key={self.api_key}"
@@ -117,17 +118,16 @@ class AIService:
                     last_error = err_msg
 
                     if err_code == 429:
-                        raise SmartLensException(
-                            429,
-                            "AI Quota Exceeded: Your Gemini API key has exceeded its quota limits. Please create a new free API key at https://aistudio.google.com/app/apikey"
-                        )
+                        hit_quota = True
+                        logger.warning(f"Gemini model {model_candidate} exceeded quota (429), trying next candidate...")
+                        continue
                     elif err_code == 400 and ("API_KEY_INVALID" in err_msg or "API key not valid" in err_msg):
                         raise SmartLensException(
                             401,
                             "Invalid Gemini API Key. Please verify your AI_API_KEY in Render environment settings."
                         )
-                    elif err_code == 404:
-                        logger.warning(f"Gemini model {model_candidate} returned 404, trying next candidate...")
+                    elif err_code == 404 or err_code == 503:
+                        logger.warning(f"Gemini model {model_candidate} returned {err_code}, trying next candidate...")
                         continue
                     else:
                         logger.warning(f"Gemini API returned {err_code} for {model_candidate}: {err_msg[:200]}")
@@ -140,6 +140,12 @@ class AIService:
                 except Exception as exc:
                     logger.warning(f"Error calling {model_candidate}: {exc}")
                     continue
+
+        if hit_quota:
+            raise SmartLensException(
+                429,
+                "AI Quota Exceeded: Your Gemini API key has exceeded its quota limits across available models. Please create a new free API key at https://aistudio.google.com/app/apikey"
+            )
 
         raise SmartLensException(
             502,

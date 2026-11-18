@@ -23,7 +23,7 @@ class Settings(BaseSettings):
     
     AI_PROVIDER: str = "gemini"  # gemini, openai, anthropic
     AI_API_KEY: str = ""
-    AI_MODEL: str = "gemini-1.5-flash"
+    AI_MODEL: str = "gemini-flash-lite-latest"
     
     SMTP_HOST: str = "smtp.gmail.com"
     SMTP_PORT: int = 587
