@@ -1,11 +1,15 @@
 import ipaddress
 import socket
+import re
+import logging
 from urllib.parse import urlparse
 import httpx
 import json
 from typing import Dict, Any, Tuple
 from app.services.ai_service import ai_service
 from app.utils.responses import SmartLensException, AI_DISCLAIMER
+
+logger = logging.getLogger("smartlens.url")
 
 PRIVATE_IP_NETWORKS = [
     ipaddress.ip_network("127.0.0.0/8"),
@@ -69,19 +73,24 @@ def is_ssrf_safe_url(url: str) -> Tuple[bool, str]:
         return False, f"URL validation error: {str(e)}"
 
 async def fetch_web_page(url: str) -> Tuple[str, str, int]:
-    is_safe, error_msg = is_ssrf_safe_url(url)
+    clean_url = url.strip()
+    if not clean_url.startswith("http://") and not clean_url.startswith("https://"):
+        clean_url = "https://" + clean_url
+
+    is_safe, error_msg = is_ssrf_safe_url(clean_url)
     if not is_safe:
         raise SmartLensException(400, error_msg)
 
     headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36 SmartLensBot/1.0",
-        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,text/plain;q=0.8,*/*;q=0.7",
         "Accept-Language": "en-US,en;q=0.9",
+        "Upgrade-Insecure-Requests": "1",
     }
 
     try:
-        async with httpx.AsyncClient(timeout=10.0, follow_redirects=True, max_redirects=5) as client:
-            response = await client.get(url, headers=headers)
+        async with httpx.AsyncClient(timeout=15.0, follow_redirects=True, max_redirects=5) as client:
+            response = await client.get(clean_url, headers=headers)
             
             # Verify final redirected URL is also SSRF-safe
             final_url = str(response.url)
@@ -101,8 +110,9 @@ async def fetch_web_page(url: str) -> Tuple[str, str, int]:
                 raise SmartLensException(400, f"Failed to retrieve page content (HTTP {response.status_code}).")
 
             content_type = response.headers.get("content-type", "").lower()
-            if "text/html" not in content_type and "application/xhtml" not in content_type:
-                raise SmartLensException(400, f"URL returned non-HTML content ({content_type}). Please provide a webpage link.")
+            # Allow text/html, application/xhtml, text/plain, or empty
+            if content_type and not any(t in content_type for t in ["text/html", "application/xhtml", "text/plain", "application/xml"]):
+                raise SmartLensException(400, f"URL returned non-textual content ({content_type}). Please provide a webpage or article link.")
 
             # Limit to 10MB
             if len(response.content) > 10 * 1024 * 1024:
@@ -113,7 +123,7 @@ async def fetch_web_page(url: str) -> Tuple[str, str, int]:
     except httpx.TimeoutException:
         raise SmartLensException(504, "Connection timed out while trying to reach the website. The server took too long to respond.")
     except httpx.ConnectError:
-        raise SmartLensException(400, "Failed to connect to the website. The server may be down or unreachable.")
+        raise SmartLensException(400, "Failed to connect to the website. The server may be down, domain expired, or unreachable.")
     except SmartLensException:
         raise
     except Exception as e:
@@ -121,14 +131,14 @@ async def fetch_web_page(url: str) -> Tuple[str, str, int]:
 
 def extract_main_text(html: str, url: str) -> Tuple[str, str, str]:
     """
-    Extract readable text using trafilatura, falling back to BeautifulSoup.
+    Extract readable text using advanced BeautifulSoup parsing with trafilatura support.
     Returns (cleaned_text, title, language).
     """
     title = ""
     language = "en"
     text = ""
 
-    # Attempt 1: trafilatura
+    # Attempt 1: trafilatura (if lxml_html_clean is available)
     try:
         import trafilatura
         extracted = trafilatura.extract(
@@ -148,27 +158,52 @@ def extract_main_text(html: str, url: str) -> Tuple[str, str, str]:
     except Exception:
         pass
 
-    # Attempt 2: BeautifulSoup fallback
+    # Attempt 2: Advanced BeautifulSoup extraction
     if not text:
         try:
             from bs4 import BeautifulSoup
             soup = BeautifulSoup(html, "html.parser")
-            
-            if not title:
-                title_tag = soup.find("title")
-                if title_tag and title_tag.string:
-                    title = title_tag.string.strip()
 
-            # Remove scripts, styles, navigations, footers, headers
-            for element in soup(["script", "style", "nav", "footer", "header", "noscript", "aside", "svg", "form"]):
-                element.decompose()
+            # Extract title: <meta property="og:title"> -> <title> -> <h1>
+            og_title = soup.find("meta", property="og:title")
+            if og_title and og_title.get("content"):
+                title = og_title["content"].strip()
+            elif soup.title and soup.title.string:
+                title = soup.title.string.strip()
+            elif soup.find("h1"):
+                title = soup.find("h1").get_text().strip()
 
-            # Get main or article if present
-            main_element = soup.find("main") or soup.find("article") or soup.find("body")
-            if main_element:
-                lines = (line.strip() for line in main_element.get_text().splitlines())
-                chunks = (phrase.strip() for line in lines for phrase in line.split("  "))
-                text = "\n".join(chunk for chunk in chunks if chunk)
+            # Detect language: <html lang="...">
+            html_tag = soup.find("html")
+            if html_tag and html_tag.get("lang"):
+                language = html_tag["lang"].split("-")[0].lower()
+
+            # Strip non-content and clutter elements
+            for tag in soup(["script", "style", "nav", "footer", "header", "noscript", "aside", "svg", "form", "iframe"]):
+                tag.decompose()
+
+            # Target primary article container
+            article = (
+                soup.find(["article", "main"]) or 
+                soup.find(class_=re.compile(r"article|content|post|entry|main", re.I)) or 
+                soup.body
+            )
+
+            if article:
+                # Gather content blocks: paragraphs, headings, list items
+                blocks = []
+                for elem in article.find_all(["h1", "h2", "h3", "h4", "p", "li"]):
+                    txt = elem.get_text().strip()
+                    # Filter out short menu or cookie items
+                    if txt and len(txt.split()) >= 3:
+                        blocks.append(txt)
+
+                if blocks:
+                    text = "\n\n".join(blocks)
+                else:
+                    lines = (line.strip() for line in article.get_text().splitlines())
+                    chunks = (phrase.strip() for line in lines for phrase in line.split("  "))
+                    text = "\n".join(c for c in chunks if c)
         except Exception:
             pass
 
@@ -194,62 +229,75 @@ async def analyze_url_content(url: str) -> Dict[str, Any]:
     reading_time_minutes = max(1, round(word_count / 238))
     domain = urlparse(final_url).hostname or ""
 
-    # Sample text for AI prompt
-    text_sample = text[:15000]
+    # Feed up to 60,000 characters (~10,000 words) for full article coverage
+    text_sample = text[:60000]
 
-    prompt = f"""
-You are an expert web content summarizer and research analyst.
-Analyze the following extracted webpage content and return ONLY pure JSON with no markdown tags.
+    prompt = f"""You are SmartLens AI, an expert web content analyst and researcher.
+Carefully review the following extracted webpage content and generate an accurate, objective, and well-structured analysis.
 
 Page Title: {title}
 Domain: {domain}
 
 Webpage Content:
+\"\"\"
 {text_sample}
+\"\"\"
 
-Output format required (pure JSON):
+Output format required (pure JSON only, no markdown code fence, no explanation):
 {{
-  "summary": "Clear, objective 2-4 paragraph synthesis of the article/page...",
+  "summary": "Cohesive, comprehensive 2-4 paragraph synthesis covering the core message, key arguments, and conclusions of the page...",
   "key_points": [
-    "Key finding or discussion point 1",
-    "Key finding or discussion point 2",
-    "Key finding or discussion point 3",
-    "Key finding or discussion point 4",
-    "Key finding or discussion point 5"
+    "Specific, factual takeaway or key finding 1",
+    "Specific, factual takeaway or key finding 2",
+    "Specific, factual takeaway or key finding 3",
+    "Specific, factual takeaway or key finding 4",
+    "Specific, factual takeaway or key finding 5"
   ],
   "main_topics": ["Topic 1", "Topic 2", "Topic 3", "Topic 4"],
   "language": "{lang}"
 }}
 """
-    raw_response = await ai_service.generate(prompt, temperature=0.3)
+    raw_response = await ai_service.generate(prompt, temperature=0.2)
 
+    # Robust JSON extraction
     cleaned = raw_response.strip()
-    if cleaned.startswith("```json"):
-        cleaned = cleaned[7:]
-    elif cleaned.startswith("```"):
-        cleaned = cleaned[3:]
-    if cleaned.endswith("```"):
-        cleaned = cleaned[:-3]
-    cleaned = cleaned.strip()
+    if "```" in cleaned:
+        match = re.search(r"```(?:json)?\s*([\s\S]*?)\s*```", cleaned)
+        if match:
+            cleaned = match.group(1).strip()
+
+    if not (cleaned.startswith("{") and cleaned.endswith("}")):
+        match = re.search(r"\{[\s\S]*\}", cleaned)
+        if match:
+            cleaned = match.group(0).strip()
 
     try:
         parsed = json.loads(cleaned)
     except Exception:
-        parsed = {
-            "summary": raw_response.strip(),
-            "key_points": [],
-            "main_topics": [],
-            "language": lang
-        }
+        parsed = {}
+
+    summary = parsed.get("summary", "").strip()
+    if not summary:
+        summary = raw_response.strip()
+
+    raw_kp = parsed.get("key_points", [])
+    if isinstance(raw_kp, str):
+        raw_kp = [raw_kp]
+    key_points = [str(p).strip() for p in raw_kp if str(p).strip()]
+
+    raw_topics = parsed.get("main_topics", [])
+    if isinstance(raw_topics, str):
+        raw_topics = [raw_topics]
+    main_topics = [str(t).strip() for t in raw_topics if str(t).strip()]
 
     return {
         "url": final_url,
         "title": title,
         "domain": domain,
         "status_code": status_code,
-        "summary": parsed.get("summary", ""),
-        "key_points": parsed.get("key_points", []),
-        "main_topics": parsed.get("main_topics", []),
+        "summary": summary,
+        "key_points": key_points,
+        "main_topics": main_topics,
         "language": parsed.get("language", lang),
         "word_count": word_count,
         "reading_time_minutes": reading_time_minutes,
