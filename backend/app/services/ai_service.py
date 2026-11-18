@@ -64,80 +64,87 @@ class AIService:
                 await asyncio.sleep(backoff ** (attempt + 1))
 
     async def _generate_gemini(self, prompt: str, temperature: float, max_tokens: int) -> str:
-        import google.generativeai as genai
-        genai.configure(api_key=self.api_key)
+        """
+        Direct REST client for Google Generative Language API.
+        Avoids the deprecated google-generativeai SDK gRPC deadlock and timeout issues.
+        """
+        import httpx
 
-        # Normalize model name
-        raw_model = (self.model or "gemini-1.5-flash").strip()
-        if raw_model.startswith("models/"):
-            raw_model = raw_model.replace("models/", "")
-        
-        generation_config = {
-            "temperature": temperature,
-            "max_output_tokens": max_tokens,
+        model_name = (self.model or "gemini-flash-latest").strip()
+        if model_name.startswith("models/"):
+            model_name = model_name.replace("models/", "")
+
+        payload = {
+            "contents": [
+                {
+                    "parts": [{"text": prompt}]
+                }
+            ],
+            "generationConfig": {
+                "temperature": temperature,
+                "maxOutputTokens": max_tokens
+            }
         }
-        
-        loop = asyncio.get_running_loop()
-        def _call_model(target_model: str):
-            model = genai.GenerativeModel(model_name=target_model, generation_config=generation_config)
-            response = model.generate_content(prompt)
-            if not response or not hasattr(response, "text"):
-                raise SmartLensException(502, "The AI model returned an empty response.")
-            return response.text
 
-        try:
-            return await loop.run_in_executor(None, lambda: _call_model(raw_model))
-        except Exception as exc:
-            err_text = str(exc)
-            if "404" in err_text or "not found" in err_text.lower():
-                logger.warning(f"Model '{raw_model}' returned 404. Calling ModelService.ListModels to discover available models for this API key...")
-                
-                def _discover_and_run():
+        candidates = [model_name, "gemini-flash-latest", "gemini-pro-latest", "gemini-1.5-flash", "gemini-2.0-flash"]
+        unique_candidates = []
+        for c in candidates:
+            if c and c not in unique_candidates:
+                unique_candidates.append(c)
+
+        last_error = ""
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            for model_candidate in unique_candidates:
+                url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_candidate}:generateContent?key={self.api_key}"
+                try:
+                    res = await client.post(url, json=payload, headers={"Content-Type": "application/json"})
+
+                    if res.status_code == 200:
+                        data = res.json()
+                        candidates_data = data.get("candidates", [])
+                        if candidates_data and "content" in candidates_data[0]:
+                            parts = candidates_data[0]["content"].get("parts", [])
+                            if parts and "text" in parts[0]:
+                                return parts[0]["text"]
+                        return ""
+
+                    err_code = res.status_code
                     try:
-                        available = []
-                        for m in genai.list_models():
-                            methods = getattr(m, "supported_generation_methods", []) or []
-                            if "generateContent" in methods:
-                                name = m.name.replace("models/", "")
-                                available.append(name)
-                        
-                        logger.info(f"Available generateContent models for this key: {available}")
-                        if not available:
-                            raise SmartLensException(
-                                502,
-                                "This API key has no enabled generateContent models. Please ensure 'Generative Language API' is enabled, or create a free key at https://aistudio.google.com/app/apikey"
-                            )
-                        
-                        # Preferred order of models
-                        priority = [
-                            "gemini-1.5-flash",
-                            "gemini-2.0-flash",
-                            "gemini-1.5-flash-latest",
-                            "gemini-1.5-flash-8b",
-                            "gemini-1.5-pro",
-                            "gemini-pro"
-                        ]
-                        selected = None
-                        for p in priority:
-                            if p in available:
-                                selected = p
-                                break
-                        if not selected:
-                            selected = available[0]
+                        err_json = res.json().get("error", {})
+                        err_msg = err_json.get("message", res.text)
+                    except Exception:
+                        err_msg = res.text
+                    last_error = err_msg
 
-                        logger.info(f"Selected working model from list_models: {selected}")
-                        return _call_model(selected)
-                    except SmartLensException:
-                        raise
-                    except Exception as discover_err:
-                        logger.error(f"Failed to discover and run fallback model: {discover_err}")
+                    if err_code == 429:
                         raise SmartLensException(
-                            502,
-                            f"AI Model Error: {str(discover_err)}. Please generate a fresh API key at https://aistudio.google.com/app/apikey"
+                            429,
+                            "AI Quota Exceeded: Your Gemini API key has exceeded its quota limits. Please create a new free API key at https://aistudio.google.com/app/apikey"
                         )
+                    elif err_code == 400 and ("API_KEY_INVALID" in err_msg or "API key not valid" in err_msg):
+                        raise SmartLensException(
+                            401,
+                            "Invalid Gemini API Key. Please verify your AI_API_KEY in Render environment settings."
+                        )
+                    elif err_code == 404:
+                        logger.warning(f"Gemini model {model_candidate} returned 404, trying next candidate...")
+                        continue
+                    else:
+                        logger.warning(f"Gemini API returned {err_code} for {model_candidate}: {err_msg[:200]}")
+                        continue
+                except SmartLensException:
+                    raise
+                except httpx.TimeoutException:
+                    logger.warning(f"Timeout calling Gemini {model_candidate}")
+                    continue
+                except Exception as exc:
+                    logger.warning(f"Error calling {model_candidate}: {exc}")
+                    continue
 
-                return await loop.run_in_executor(None, _discover_and_run)
-            raise
+        raise SmartLensException(
+            502,
+            f"Gemini AI error: {last_error[:250] if last_error else 'Unable to generate content with current API key. Please check your key at https://aistudio.google.com/app/apikey'}"
+        )
 
     async def _generate_openai(self, prompt: str, temperature: float, max_tokens: int) -> str:
         from openai import AsyncOpenAI
