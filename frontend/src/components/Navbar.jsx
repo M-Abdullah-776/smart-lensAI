@@ -2,11 +2,11 @@ import React from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../stores/authStore';
 import { useSettingsStore } from '../stores/settingsStore';
-import { Sparkles, User, LogOut, Shield, LayoutDashboard } from 'lucide-react';
+import { Sparkles, User, LogOut, Shield, LayoutDashboard, Sun, Moon } from 'lucide-react';
 
 export const Navbar = () => {
   const { user, isAuthenticated, logout } = useAuthStore();
-  const { particlesEnabled, toggleParticles } = useSettingsStore();
+  const { particlesEnabled, toggleParticles, darkMode, toggleTheme } = useSettingsStore();
   const navigate = useNavigate();
 
   const handleLogout = async () => {
@@ -27,17 +27,31 @@ export const Navbar = () => {
         </Link>
 
         <div className="flex items-center gap-3 md:gap-4">
+
+          {/* 3D FX toggle — icon only, no text */}
           <button
             onClick={toggleParticles}
             title={particlesEnabled ? "Disable Background Particles" : "Enable Background Particles"}
-            className={`p-2 rounded-lg border text-xs flex items-center gap-1.5 transition-colors ${
+            className={`p-2 rounded-lg border transition-colors ${
               particlesEnabled
                 ? 'bg-indigo-500/10 border-indigo-500/30 text-indigo-300'
                 : 'bg-white/5 border-white/10 text-slate-400 hover:text-slate-200'
             }`}
           >
             <Sparkles className="w-4 h-4" />
-            <span className="hidden sm:inline">3D FX</span>
+          </button>
+
+          {/* Dark / Light mode toggle */}
+          <button
+            onClick={toggleTheme}
+            title={darkMode ? "Switch to Light Mode" : "Switch to Dark Mode"}
+            className={`p-2 rounded-lg border transition-colors ${
+              darkMode
+                ? 'bg-white/5 border-white/10 text-amber-300 hover:text-amber-200 hover:bg-amber-500/10'
+                : 'bg-indigo-500/10 border-indigo-500/30 text-indigo-600 hover:bg-indigo-500/20'
+            }`}
+          >
+            {darkMode ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
           </button>
 
           {isAuthenticated ? (
