@@ -106,44 +106,53 @@ async def summarize_document(
     include_key_points: bool = True,
     detailed: bool = False
 ) -> Dict[str, Any]:
-    chunks = chunk_text(text)
-    
-    if len(chunks) == 1:
-        doc_context = chunks[0]
+    # Modern LLMs (e.g. Gemini 1.5 Flash) have large context windows (1M tokens).
+    # Keep up to 120,000 characters (~20,000 words) in a single pass to maintain full document coherence
+    # without triggering multi-call rate limits.
+    max_text_chars = 120000
+    if len(text) > max_text_chars:
+        # Take the opening sections (context/background) and closing sections (conclusions/recommendations)
+        half = max_text_chars // 2
+        doc_context = text[:half] + "\n\n[... Middle sections omitted for length ...]\n\n" + text[-half:]
     else:
-        # Hierarchical summarization for long documents
-        chunk_summaries = []
-        for i, c in enumerate(chunks[:5]):  # Process up to 5 large chunks
-            prompt = f"Summarize section {i+1} of the document concisely in 2-3 paragraphs:\n\n{c}"
-            summary_piece = await ai_service.generate(prompt, temperature=0.2)
-            chunk_summaries.append(summary_piece)
-        doc_context = "\n\n".join(chunk_summaries)
+        doc_context = text
 
     detail_instruction = (
-        "Provide a comprehensive, in-depth executive summary." if detailed 
-        else "Provide a clear, high-level executive summary in 2 to 4 paragraphs."
+        "Provide an in-depth, comprehensive executive summary with key background, thorough findings, and strategic takeaways."
+        if detailed else
+        "Provide a clear, high-impact executive summary in 2 to 4 well-structured paragraphs covering the document's core purpose, major results, and conclusions."
     )
 
-    prompt = f"""
-You are an expert document analysis system. Analyze the following document text and return ONLY valid JSON with no markdown wrapping.
+    prompt = f"""You are an advanced document intelligence system. Carefully read and analyze the following document text, then generate an accurate, factual, and well-structured response.
 
-{detail_instruction}
+ANALYSIS INSTRUCTIONS:
+1. Executive Summary: {detail_instruction}
+2. Key Points: Extract 4 to 8 specific, factual key findings (include exact data, dates, statistics, and conclusions where present).
+3. Main Topics: Identify 3 to 6 major thematic tags or subject areas.
 
-Document Text:
+DOCUMENT DETAILS:
+- Approximate Pages: {page_count}
+- Word Count: {word_count}
+
+DOCUMENT CONTENT:
+\"\"\"
 {doc_context}
+\"\"\"
 
-Output format required (pure JSON):
+RESPONSE FORMAT:
+You MUST respond with pure JSON only (no explanations, no preamble). Follow this exact JSON schema:
 {{
-  "summary": "Full summary text here...",
+  "summary": "Cohesive executive summary of the document...",
   "key_points": [
-    "Key point 1...",
-    "Key point 2...",
-    "Key point 3..."
+    "Key point or finding 1 with details",
+    "Key point or finding 2 with details",
+    "Key point or finding 3 with details",
+    "Key point or finding 4 with details"
   ],
   "main_topics": ["Topic 1", "Topic 2", "Topic 3"]
 }}
 """
-    raw_response = await ai_service.generate(prompt, temperature=0.3)
+    raw_response = await ai_service.generate(prompt, temperature=0.2)
     
     # Parse JSON cleanly
     cleaned = raw_response.strip()
@@ -155,6 +164,13 @@ Output format required (pure JSON):
         cleaned = cleaned[:-3]
     cleaned = cleaned.strip()
 
+    # If wrapped in other text, attempt to locate JSON object
+    if not (cleaned.startswith("{") and cleaned.endswith("}")):
+        import re
+        match = re.search(r"\{.*\}", cleaned, re.DOTALL)
+        if match:
+            cleaned = match.group(0)
+
     try:
         parsed = json.loads(cleaned)
     except Exception:
@@ -164,10 +180,14 @@ Output format required (pure JSON):
             "main_topics": []
         }
 
+    summary_text = parsed.get("summary", "").strip() or raw_response.strip()
+    key_points_list = parsed.get("key_points", []) if include_key_points else []
+    main_topics_list = parsed.get("main_topics", [])
+
     return {
-        "summary": parsed.get("summary", ""),
-        "key_points": parsed.get("key_points", []) if include_key_points else [],
-        "main_topics": parsed.get("main_topics", []),
+        "summary": summary_text,
+        "key_points": key_points_list,
+        "main_topics": main_topics_list,
         "page_count": page_count,
         "word_count": word_count,
         "ai_disclaimer": AI_DISCLAIMER

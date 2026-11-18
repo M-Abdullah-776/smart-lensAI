@@ -7,10 +7,17 @@ from app.utils.responses import SmartLensException
 logger = logging.getLogger("smartlens.ai")
 
 class AIService:
-    def __init__(self):
-        self.provider = settings.AI_PROVIDER.lower().strip()
-        self.api_key = settings.AI_API_KEY.strip()
-        self.model = settings.AI_MODEL.strip()
+    @property
+    def provider(self) -> str:
+        return (settings.AI_PROVIDER or "gemini").lower().strip()
+
+    @property
+    def api_key(self) -> str:
+        return (settings.AI_API_KEY or "").strip()
+
+    @property
+    def model(self) -> str:
+        return (settings.AI_MODEL or "gemini-1.5-flash").strip()
 
     async def generate(self, prompt: str, temperature: float = 0.3, max_tokens: int = 4096) -> str:
         """
@@ -19,7 +26,7 @@ class AIService:
         if not self.api_key:
             raise SmartLensException(
                 status_code=503,
-                detail="AI service is not configured. Please supply an AI API key in the server environment."
+                detail="AI service is not configured. Please add an AI_API_KEY (e.g. Gemini API Key) to the server environment."
             )
 
         max_retries = 3
@@ -44,27 +51,34 @@ class AIService:
                 logger.warning(f"AI generation attempt {attempt + 1} failed: {str(e)}")
                 if attempt == max_retries - 1:
                     logger.error(f"AI generation failed after {max_retries} attempts: {str(e)}", exc_info=True)
-                    raise SmartLensException(
-                        status_code=502,
-                        detail="The AI processing service encountered a temporary error. Please try again in a moment."
-                    )
+                    error_msg = str(e)
+                    if "API_KEY_INVALID" in error_msg or "API key not valid" in error_msg:
+                        raise SmartLensException(status_code=502, detail="The configured AI API key is invalid. Please verify your Gemini API key.")
+                    elif "ResourceExhausted" in error_msg or "429" in error_msg:
+                        raise SmartLensException(status_code=429, detail="AI rate limit reached. Please wait a moment before trying again.")
+                    else:
+                        raise SmartLensException(
+                            status_code=502,
+                            detail=f"AI service error: {str(e)[:200]}"
+                        )
                 await asyncio.sleep(backoff ** (attempt + 1))
 
     async def _generate_gemini(self, prompt: str, temperature: float, max_tokens: int) -> str:
         import google.generativeai as genai
         genai.configure(api_key=self.api_key)
-        model_name = self.model if self.model else "gemini-1.5-pro"
+        model_name = self.model or "gemini-1.5-flash"
         
         generation_config = {
             "temperature": temperature,
             "max_output_tokens": max_tokens,
         }
         
-        # Run blocking SDK in executor to prevent blocking the event loop
         loop = asyncio.get_running_loop()
         def _call():
             model = genai.GenerativeModel(model_name=model_name, generation_config=generation_config)
             response = model.generate_content(prompt)
+            if not response or not hasattr(response, "text"):
+                raise SmartLensException(502, "The AI model returned an empty response.")
             return response.text
 
         return await loop.run_in_executor(None, _call)

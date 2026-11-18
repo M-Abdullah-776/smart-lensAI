@@ -37,7 +37,20 @@ export const DocumentAnalyzer = () => {
       );
       setResult(res.data);
     } catch (err) {
-      setError(err.response?.data?.detail || 'An error occurred during document analysis.');
+      const data = err.response?.data;
+      if (data?.detail) {
+        if (Array.isArray(data.detail)) {
+          setError(data.detail.map((d) => d.msg || JSON.stringify(d)).join('. '));
+        } else if (typeof data.detail === 'string') {
+          setError(data.detail);
+        } else {
+          setError(JSON.stringify(data.detail));
+        }
+      } else if (!err.response) {
+        setError('Cannot reach server. The backend may be waking up or the file upload timed out — please try again.');
+      } else {
+        setError('An error occurred during document analysis. Please check the file and try again.');
+      }
     } finally {
       setLoading(false);
     }
